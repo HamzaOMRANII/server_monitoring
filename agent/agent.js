@@ -7,7 +7,7 @@
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
-const { load } = require('../central/config');
+const { load } = require('../src/server/config');
 const collectors = require('./collectors');
 
 const cfg = load();

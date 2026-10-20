@@ -1,14 +1,25 @@
 {
-  "name": "server_monitoring",
+  "name": "omrani-monitoring",
   "version": "0.1.0",
   "private": true,
-  "description": "Alert-first server monitoring for the omranisystems fleet (central + agent).",
+  "description": "monitoring.omranisystems.com: alert-first server monitoring (central + agent).",
   "scripts": {
-    "central": "node central/server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node src/server.js",
     "agent": "node agent/agent.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "express": "^4.19.2",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
   }
 }

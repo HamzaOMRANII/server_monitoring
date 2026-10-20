@@ -1,6 +1,7 @@
 {
   "central": {
-    "port": 8080,
+    "host": "127.0.0.1",
+    "port": 16000,
     "password": "change-me-to-a-strong-password",
     "sessionSecret": "change-me-to-a-long-random-string",
     "ingestToken": "change-me-shared-with-every-agent"
@@ -19,17 +20,12 @@
       "to": ["you@omranisystems.com"],
       "from": "monitoring@omranisystems.com",
       "smtp": { "host": "smtp.example.com", "port": 587, "secure": false, "user": "", "pass": "" }
-    },
-    "telegram": {
-      "enabled": false,
-      "botToken": "",
-      "chatId": ""
     }
   },
 
   "agent": {
     "serverName": "agent-1",
-    "centralUrl": "http://localhost:8080",
+    "centralUrl": "http://127.0.0.1:16000",
     "ingestToken": "change-me-shared-with-every-agent",
     "sampleSeconds": 10,
     "nginxSitesDir": "/etc/nginx/sites-enabled"

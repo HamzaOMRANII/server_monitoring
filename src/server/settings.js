@@ -1,12 +1,12 @@
 'use strict';
 
-// Live settings: alert rules + receivers. Seeded from config on first run,
-// then persisted to data/settings.json so edits in the settings screen
+// Live settings: alert rules + the email receiver. Seeded from config on first
+// run, then persisted to data/settings.json so edits in the settings screen
 // survive restarts. The alert engine and notifier read from here, not from
 // config directly, so changes take effect immediately.
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { ROOT } = require('./config');
 
 const DATA_DIR = path.join(ROOT, 'data');
@@ -36,15 +36,9 @@ function get() {
   return current;
 }
 
-// Shallow-merge an update (used by the settings API). Secrets passed as empty
-// strings are ignored so the UI never has to echo them back.
 function update(patch) {
-  if (patch.alertRules) {
-    current.alertRules = mergeRules(current.alertRules, patch.alertRules);
-  }
-  if (patch.receivers) {
-    current.receivers = mergeReceivers(current.receivers, patch.receivers);
-  }
+  if (patch.alertRules) current.alertRules = mergeRules(current.alertRules, patch.alertRules);
+  if (patch.receivers) current.receivers = mergeReceivers(current.receivers, patch.receivers);
   persist();
   return current;
 }
@@ -57,21 +51,22 @@ function mergeRules(base, incoming) {
   return out;
 }
 
+// Only the email channel in v1. A blank smtp password from the form means
+// "keep the stored one" so the UI never has to echo the secret back.
 function mergeReceivers(base, incoming) {
-  const out = JSON.parse(JSON.stringify(base));
-  for (const [channel, cfg] of Object.entries(incoming)) {
-    out[channel] = out[channel] || {};
-    for (const [k, v] of Object.entries(cfg)) {
-      // don't overwrite a stored secret with an empty string from the form
-      if ((k === 'pass' || k === 'botToken') && v === '') continue;
+  const out = JSON.parse(JSON.stringify(base || {}));
+  const email = incoming.email;
+  if (email) {
+    out.email = out.email || {};
+    for (const [k, v] of Object.entries(email)) {
       if (k === 'smtp') {
-        out[channel].smtp = { ...(out[channel].smtp || {}) };
+        out.email.smtp = { ...(out.email.smtp || {}) };
         for (const [sk, sv] of Object.entries(v)) {
           if (sk === 'pass' && sv === '') continue;
-          out[channel].smtp[sk] = sv;
+          out.email.smtp[sk] = sv;
         }
       } else {
-        out[channel][k] = v;
+        out.email[k] = v;
       }
     }
   }
@@ -83,9 +78,6 @@ function publicView() {
   const safe = JSON.parse(JSON.stringify(current));
   if (safe.receivers && safe.receivers.email && safe.receivers.email.smtp) {
     safe.receivers.email.smtp.pass = safe.receivers.email.smtp.pass ? '••••••' : '';
-  }
-  if (safe.receivers && safe.receivers.telegram) {
-    safe.receivers.telegram.botToken = safe.receivers.telegram.botToken ? '••••••' : '';
   }
   return safe;
 }

@@ -1,13 +1,19 @@
 'use strict';
 
 // Loads config.json (falling back to config.example.json so the app still
-// boots for a first look). Environment variables override the most sensitive
-// values so secrets don't have to live on disk in production.
+// boots for a first look). The most sensitive values can be overridden by the
+// environment / .env, matching how it.omranisystems.com is run under pm2.
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..', '..');
+
+try {
+  process.loadEnvFile(path.join(ROOT, '.env'));
+} catch {
+  // no .env — rely on the real environment (pm2 sets it in production)
+}
 
 function load() {
   const real = path.join(ROOT, 'config.json');
@@ -20,9 +26,9 @@ function load() {
 
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
 
-  // Env overrides (preferred in production).
   cfg.central = cfg.central || {};
-  if (process.env.CENTRAL_PORT) cfg.central.port = Number(process.env.CENTRAL_PORT);
+  if (process.env.PORT) cfg.central.port = Number(process.env.PORT);
+  if (process.env.HOST) cfg.central.host = process.env.HOST;
   if (process.env.CENTRAL_PASSWORD) cfg.central.password = process.env.CENTRAL_PASSWORD;
   if (process.env.SESSION_SECRET) cfg.central.sessionSecret = process.env.SESSION_SECRET;
   if (process.env.INGEST_TOKEN) cfg.central.ingestToken = process.env.INGEST_TOKEN;
