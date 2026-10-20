@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings · Monitoring</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">omranisystems monitoring <small>settings</small></div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/settings.html" class="active">Settings</a>
+      <a href="#" id="logout">Sign out</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <form id="settings-form">
+      <div class="card form-card">
+        <h2>Alert thresholds</h2>
+        <p class="muted">Fire an alert when a metric crosses its threshold.</p>
+        <div id="rules"></div>
+      </div>
+
+      <div class="card form-card">
+        <h2>Email receiver</h2>
+        <div class="field toggle"><input type="checkbox" id="email-enabled" /><label for="email-enabled">Send alerts by email</label></div>
+        <div class="field"><label>Send to (comma-separated)</label><input type="text" id="email-to" placeholder="you@omranisystems.com" /></div>
+        <div class="field"><label>From</label><input type="text" id="email-from" placeholder="monitoring@omranisystems.com" /></div>
+        <div class="row">
+          <div class="field"><label>SMTP host</label><input type="text" id="smtp-host" /></div>
+          <div class="field"><label>Port</label><input type="number" id="smtp-port" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>SMTP user</label><input type="text" id="smtp-user" /></div>
+          <div class="field"><label>SMTP password</label><input type="password" id="smtp-pass" placeholder="leave blank to keep" /></div>
+        </div>
+      </div>
+
+      <div class="card form-card">
+        <h2>Telegram receiver</h2>
+        <div class="field toggle"><input type="checkbox" id="tg-enabled" /><label for="tg-enabled">Send alerts to Telegram</label></div>
+        <div class="field"><label>Bot token</label><input type="password" id="tg-token" placeholder="leave blank to keep" /></div>
+        <div class="field"><label>Chat ID</label><input type="text" id="tg-chat" /></div>
+      </div>
+
+      <button type="submit">Save settings</button>
+      <span class="saved" id="saved"></span>
+    </form>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>settingsPage();</script>
+</body>
+</html>

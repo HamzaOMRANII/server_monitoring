@@ -1,0 +1,14 @@
+{
+  "name": "server_monitoring",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Alert-first server monitoring for the omranisystems fleet (central + agent).",
+  "scripts": {
+    "central": "node central/server.js",
+    "agent": "node agent/agent.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.14"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "central": {
+    "port": 8080,
+    "password": "change-me-to-a-strong-password",
+    "sessionSecret": "change-me-to-a-long-random-string",
+    "ingestToken": "change-me-shared-with-every-agent"
+  },
+
+  "alertRules": {
+    "cpuPercent":  { "enabled": true, "threshold": 85, "remindMinutes": 15 },
+    "memPercent":  { "enabled": true, "threshold": 90, "remindMinutes": 15 },
+    "diskPercent": { "enabled": true, "threshold": 85, "remindMinutes": 60 },
+    "pm2Restart":  { "enabled": true, "note": "fires when a process is in a restart loop" }
+  },
+
+  "receivers": {
+    "email": {
+      "enabled": false,
+      "to": ["you@omranisystems.com"],
+      "from": "monitoring@omranisystems.com",
+      "smtp": { "host": "smtp.example.com", "port": 587, "secure": false, "user": "", "pass": "" }
+    },
+    "telegram": {
+      "enabled": false,
+      "botToken": "",
+      "chatId": ""
+    }
+  },
+
+  "agent": {
+    "serverName": "agent-1",
+    "centralUrl": "http://localhost:8080",
+    "ingestToken": "change-me-shared-with-every-agent",
+    "sampleSeconds": 10,
+    "nginxSitesDir": "/etc/nginx/sites-enabled"
+  }
+}

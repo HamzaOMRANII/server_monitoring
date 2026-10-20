@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monitoring · omranisystems</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">omranisystems monitoring <small>fleet overview</small></div>
+    <nav>
+      <a href="/" class="active">Dashboard</a>
+      <a href="/settings.html">Settings</a>
+      <a href="#" id="logout">Sign out</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <div id="alerts" class="alert-banner clear"><h3>Active alerts</h3><div id="alerts-body">Loading…</div></div>
+    <div class="grid" id="servers"></div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>dashboard();</script>
+</body>
+</html>
