@@ -1,109 +1,96 @@
 # server_monitoring
 
-Alert-first server monitoring for the Omrani Systems fleet —
-**monitoring.omranisystems.com**.
+Alert-first, **single-server** monitoring — one self-contained instance per box
+that watches the machine it runs on and shows only that machine. Install it on
+any server you want to watch. No central/fleet view by design.
 
 Built on the **same stack as it.omranisystems.com**: a React 19 + Vite 8
 client, served in production by a zero-dependency Node `http` server behind
 nginx. The only runtime dependency is `nodemailer` (email alerts).
 
-> **v1 scope.** Core loop (agent → central → alert → email) plus a read-only
-> dashboard and a settings screen for thresholds + the email receiver. Built
-> **central + agent** from day one so it scales to a fleet; your current
-> server is simply "agent #1".
->
-> Deliberately **not** in v1: a raw web terminal. See [Security](#security).
-> Alerts are **email only** in v1.
+The reference deployment is **monitoring.omranisystems.com** (port 16000).
 
-## Architecture
+## What it shows
+
+- **Stat tiles** — CPU, memory, main-disk usage, uptime, pm2 apps online,
+  nginx sites.
+- **History charts** — CPU and memory over the last hour (inline-SVG area
+  charts with a hover crosshair + tooltip).
+- **Storage** — a ring gauge for the main mount plus a used/total bar per
+  mount, coloured by usage level.
+- **Apps (pm2)** — status, CPU, memory, uptime, restarts per process.
+- **nginx** — the routing map (server_name → upstream) across `nginx.conf`,
+  `conf.d/` and `sites-enabled/`, with TLS expiry where a per-site cert exists.
+- **Specs** — hostname, platform, CPU, memory, IPs, load average.
+
+## How it works
 
 ```
-  ┌─────────────┐   metrics (HTTP + token)    ┌──────────────────────────┐
-  │   agent     │  ─────────────────────────▶ │        central           │
-  │ (each box)  │                             │  monitoring.omrani…com    │
-  │ collectors: │                             │  Node http (:16000)       │
-  │  cpu/mem    │                             │  • /api/ingest  (token)  │
-  │  disk       │                             │  • alert engine (state)  │
-  │  pm2        │                             │  • email notifier        │
-  │  nginx+ssl  │                             │  • React SPA (dist/)     │
-  │  specs      │                             │  • login gate            │
-  └─────────────┘                             └──────────────────────────┘
+         ┌──────────────────────────────────────────────┐
+         │  monitor (one per box)   Node http :16000      │
+         │                                                │
+         │  sampler ── collectors (cpu/mem/disk/pm2/      │
+         │     every N s     nginx/specs) ── store        │
+         │                              │                 │
+         │                        alert engine ── email   │
+         │                                                │
+         │  React SPA (dist/) + /api + login gate         │
+         └──────────────────────────────────────────────┘
 ```
 
-- **agent** (`agent/`) — a thin Node process that samples the box every N
-  seconds and POSTs a snapshot to central with a shared token. Runs under pm2
-  on each monitored server.
-- **central** (`src/`) — React client (`src/client/`) + a zero-dep Node `http`
-  server (`src/server.js`) that serves the built SPA, exposes the API, runs the
-  alert engine, and gates the UI behind a password session.
-
-## The alert loop (the actual product)
-
-For every incoming snapshot, each enabled rule is evaluated:
-
-1. value crosses its threshold → `OK → FIRING`, send **one** email.
-2. while `FIRING`, re-send every `remindMinutes`.
-3. value drops back under threshold → `FIRING → OK`, send a **recovered** email.
-
-State lives in `src/server/alerts.js`.
+An in-process **sampler** runs the collectors on a timer, records each snapshot
+to an in-memory ring buffer, and feeds the **alert engine** (threshold →
+`FIRING` → reminder → recovered, by email). The React dashboard reads
+`/api/metrics` and `/api/history`. Everything is gated behind a password login.
 
 ## Quick start (local dev)
 
 ```bash
 npm install
-cp config.example.json config.json     # set password, sessionSecret, ingestToken, SMTP
+cp config.example.json config.json     # set password, sessionSecret, SMTP
 
-# Terminal 1 — backend API + alert engine on :16000
-npm start
-
-# Terminal 2 — Vite dev client on :16001 (proxies /api to :16000)
-npm run dev
-
-# Terminal 3 — an agent reporting into central
-npm run agent
+npm start      # app + built SPA on :16000 (also runs the sampler)
+npm run dev    # Vite dev client on :16001 (proxies /api) — for development
 ```
 
-Dev UI: http://127.0.0.1:16001  ·  Production build is served by `npm start`
-on :16000 (after `npm run build`).
+## Deploy on any server
 
-## Production (same shape as it.omranisystems.com)
+See **[deploy/INSTALL.md](deploy/INSTALL.md)**. In short, on the target box:
 
 ```bash
-npm run build          # writes dist/
-pm2 start npm --name monitoring -- start   # serves dist/ + API on :16000
+git clone git@github.com:HamzaOMRANII/server_monitoring.git /opt/monitoring
+cd /opt/monitoring
+./deploy/install.sh --domain monitoring.myserver.com   # build + config + pm2 + nginx
+certbot --nginx -d monitoring.myserver.com             # TLS (standalone boxes)
 ```
 
-Then point nginx `monitoring.omranisystems.com` at `127.0.0.1:16000` with TLS.
-On each monitored box, run the agent under pm2 with `CENTRAL_URL` and the
-shared `INGEST_TOKEN`. Config can come from `config.json` or the environment /
-`.env` (`PORT`, `HOST`, `CENTRAL_PASSWORD`, `SESSION_SECRET`, `INGEST_TOKEN`).
+`install.sh` is self-contained (no shared ecosystem file needed), generates
+secrets, starts pm2, and writes the nginx proxy. `deploy/nginx.template.conf`
+is the proxy template.
+
+## Configuration (`config.json`, gitignored)
+
+- `central` — `host`, `port`, `password` (dashboard login), `sessionSecret`.
+- `monitor` — `serverName` (display; defaults to hostname), `sampleSeconds`,
+  `nginxSitesDir`.
+- `alertRules` — CPU / RAM / disk thresholds + reminder minutes.
+- `receivers.email` — SMTP (Gmail: App Password, `smtp.gmail.com:465`, TLS).
+
+Thresholds and the email receiver can also be edited live in the **Settings**
+page (no restart).
 
 ## Security
 
-This app sees your processes, nginx routing, and IPs — treat it as sensitive.
-
-- **Login gate on the whole UI** (`src/server/auth.js`): HMAC-signed session
-  cookie, password from config/env. The API returns 401 without it.
-- **Agent → central is token-authed** with a shared `INGEST_TOKEN`.
-- **Read-only by default.** v1 exposes no state-changing actions on boxes.
-- **Before going public:** terminate TLS at nginx, add an IP allowlist, and
-  ideally keep the whole thing behind a VPN / Tailscale.
-- **No raw terminal.** A password-gated web shell on a public URL is a
-  fleet-wide RCE backdoor. The planned path is *scoped action buttons*
-  (restart a pm2 app, reload nginx, tail a log) as named, audited operations.
-
-## Roadmap
-
-- **Core (this draft):** agent→central pipeline · CPU/RAM/disk threshold
-  alerts with firing/recover state · email receiver + test-send · read-only
-  dashboard · login gate.
-- **Fast-follow:** scoped action buttons · uptime 200-check · live start/stop
-  stream · log tail · persist history to SQLite.
-- **Later:** multi-server fleet view · per-rule routing · true terminal behind
-  VPN (only if still wanted).
+- **Login gate** on the whole UI (HMAC session cookie); API returns 401 without
+  it. `/healthz` is the only open path.
+- App binds `127.0.0.1` only — nginx terminates TLS and is the public door.
+- Before exposing publicly: TLS, and ideally an IP allowlist / VPN.
+- **No raw terminal.** A password-gated web shell is a remote-code-execution
+  backdoor; scoped action buttons (restart a pm2 app, reload nginx) are the
+  planned path instead.
 
 ## Styling
 
-Design tokens live at the top of `src/client/styles.css`, inherited from
+Design tokens at the top of `src/client/styles.css` are inherited from
 `it.omranisystems.com` (navy palette, Sora / Inter / JetBrains Mono, petrol +
 gold accents, ambient orbs) so the two sites read as one family.

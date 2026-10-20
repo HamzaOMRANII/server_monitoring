@@ -27,11 +27,12 @@ function load() {
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
 
   cfg.central = cfg.central || {};
+  cfg.monitor = cfg.monitor || {};
   if (process.env.PORT) cfg.central.port = Number(process.env.PORT);
   if (process.env.HOST) cfg.central.host = process.env.HOST;
   if (process.env.CENTRAL_PASSWORD) cfg.central.password = process.env.CENTRAL_PASSWORD;
   if (process.env.SESSION_SECRET) cfg.central.sessionSecret = process.env.SESSION_SECRET;
-  if (process.env.INGEST_TOKEN) cfg.central.ingestToken = process.env.INGEST_TOKEN;
+  if (process.env.SERVER_NAME) cfg.monitor.serverName = process.env.SERVER_NAME;
 
   return cfg;
 }

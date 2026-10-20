@@ -21,8 +21,8 @@ async function req(method, url, body) {
 export const api = {
   login: (password) => req('POST', '/api/login', { password }),
   logout: () => req('POST', '/api/logout'),
-  overview: () => req('GET', '/api/overview'),
-  server: (name) => req('GET', `/api/server/${encodeURIComponent(name)}`),
+  metrics: () => req('GET', '/api/metrics'),
+  history: (minutes = 60) => req('GET', `/api/history?minutes=${minutes}`),
   getSettings: () => req('GET', '/api/settings'),
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),

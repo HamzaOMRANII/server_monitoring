@@ -1,40 +1,30 @@
 'use strict';
 
-// In-memory store of recent snapshots, keyed by server name. A ring buffer per
-// server keeps roughly the last window so the dashboard can draw "last hour"
-// without a database. v1 is memory-only on purpose; the roadmap swaps this for
-// SQLite without changing callers.
+// In-memory store of recent snapshots for THIS server (single-server app). A
+// ring buffer keeps roughly the last window so the dashboard can draw history
+// without a database. v1 is memory-only on purpose; a later version can swap
+// this for SQLite without changing callers.
 
-const MAX_SAMPLES = 720; // ~2h at one sample / 10s
+const MAX_SAMPLES = 1440; // ~4h at one sample / 10s
 
-const servers = new Map(); // name -> { latest, history: [snapshot...] }
+let latest = null;
+const history = []; // [snapshot...]
 
 function record(snapshot) {
-  const name = snapshot.server || 'unknown';
-  if (!servers.has(name)) servers.set(name, { history: [] });
-  const entry = servers.get(name);
-  entry.latest = snapshot;
-  entry.history.push(snapshot);
-  if (entry.history.length > MAX_SAMPLES) {
-    entry.history.splice(0, entry.history.length - MAX_SAMPLES);
-  }
-  return entry;
+  latest = snapshot;
+  history.push(snapshot);
+  if (history.length > MAX_SAMPLES) history.splice(0, history.length - MAX_SAMPLES);
+  return snapshot;
 }
 
-function latest(name) {
-  const entry = servers.get(name);
-  return entry ? entry.latest : null;
+function current() {
+  return latest;
 }
 
-function allLatest() {
-  return [...servers.values()].map((e) => e.latest).filter(Boolean);
-}
-
-function history(name, sinceMs = 60 * 60 * 1000) {
-  const entry = servers.get(name);
-  if (!entry) return [];
+// Snapshots from the last `sinceMs` (default 60 min).
+function since(sinceMs = 60 * 60 * 1000) {
   const cutoff = Date.now() - sinceMs;
-  return entry.history.filter((s) => s.ts >= cutoff);
+  return history.filter((s) => s.ts >= cutoff);
 }
 
-module.exports = { record, latest, allLatest, history };
+module.exports = { record, current, since };

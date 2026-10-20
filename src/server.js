@@ -4,11 +4,13 @@
  * Same shape as it.omranisystems.com/src/server.js — a zero-dependency Node
  * http server that serves the Vite build (./dist) behind nginx — but extended
  * with:
- *   - /api/*     the monitoring API (ingest, overview, settings, auth)
+ *   - an in-process sampler that monitors the single box this runs on
+ *   - /api/*     the monitoring API (metrics, history, settings, auth)
  *   - a login gate on the SPA: unauthenticated page loads are redirected to
  *     /login, and the API returns 401 (the client redirects).
  *   - /healthz   for pm2 / uptime checks
  *
+ * Single-server by design: one instance per box, each showing only itself.
  * The only runtime dependency is nodemailer (email alerts). Env: PORT
  * (default 16000), HOST (default 127.0.0.1) — from the environment or .env.
  */
@@ -21,12 +23,14 @@ const path = require('node:path');
 const { load, ROOT } = require('./server/config');
 const authFactory = require('./server/auth');
 const settings = require('./server/settings');
+const sampler = require('./server/sampler');
 const api = require('./server/api');
 const { sendText } = require('./server/http-util');
 
 const cfg = load();
 settings.seedFrom(cfg);
 const auth = authFactory.create(cfg);
+const serverName = sampler.start(cfg); // begin sampling this box immediately
 
 const PORT = cfg.central.port || 16000;
 const HOST = cfg.central.host || '127.0.0.1';

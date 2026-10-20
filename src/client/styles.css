@@ -172,3 +172,62 @@ button.secondary{ background: transparent; color: var(--ink); border: 1px solid 
   .srv-grid{ grid-template-columns: minmax(0,1fr); }
   .row, .rule-row{ flex-direction: column; gap: 10px; align-items: stretch; }
 }
+
+/* ===================== single-server dashboard ===================== */
+.live-dot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--petrol-bright);
+  box-shadow:0 0 0 0 color-mix(in srgb, var(--petrol-bright) 70%, transparent); animation: live 2.4s ease-out infinite; margin-right:4px; vertical-align:middle; }
+@keyframes live{ 0%{ box-shadow:0 0 0 0 color-mix(in srgb,var(--petrol-bright) 60%,transparent);} 70%{ box-shadow:0 0 0 7px transparent;} 100%{ box-shadow:0 0 0 0 transparent;} }
+.mono{ font-family:var(--font-mono); }
+.h2-sub{ font-family:var(--font-mono); font-size:12px; font-weight:400; margin-left:6px; }
+
+/* stat tiles */
+.tiles{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+.tile-stat{ padding:16px 18px; border:1px solid var(--navy-line); border-radius:16px; background:rgba(10,21,36,0.6); backdrop-filter:blur(8px); }
+.tile-label{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-dim); }
+.tile-value{ font-family:var(--font-mark); font-size:30px; font-weight:700; color:#fff; line-height:1.1; margin-top:6px; }
+.tile-unit{ font-size:16px; font-weight:600; color:var(--ink-muted); margin-left:2px; }
+.tile-track{ height:6px; background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden; margin-top:10px; }
+.tile-fill{ height:100%; border-radius:999px; background:var(--petrol-bright); transition:width .4s ease; }
+.tile-fill.warn{ background:var(--gold); } .tile-fill.crit{ background:var(--crit); }
+.tile-sub{ font-size:12px; color:var(--ink-muted); margin-top:8px; }
+
+/* charts */
+.charts{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.chart-panel{ padding:16px 18px; }
+.chart-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+.chart-title{ font-family:var(--font-mark); font-size:14px; font-weight:600; color:#fff; }
+.chart-now{ font-family:var(--font-mono); font-size:18px; font-weight:600; }
+.chart-svg{ width:100%; display:block; }
+.chart-grid{ stroke:var(--navy-line); stroke-width:1; vector-effect:non-scaling-stroke; }
+.chart-axis{ fill:var(--ink-dim); font-family:var(--font-mono); font-size:9px; }
+.chart-cross{ stroke:var(--ink-muted); stroke-width:1; stroke-dasharray:3 3; vector-effect:non-scaling-stroke; }
+.chart-empty{ display:grid; place-items:center; color:var(--ink-dim); font-family:var(--font-mono); font-size:12px; }
+.chart-tip{ font-size:12px; margin-top:6px; font-family:var(--font-mono); }
+
+/* storage */
+.storage-body{ display:grid; grid-template-columns:200px 1fr; gap:24px; align-items:center; }
+.storage-ring{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+.ring{ width:140px; height:140px; }
+.ring-track{ stroke:rgba(255,255,255,0.07); }
+.ring-pct{ fill:#fff; font-family:var(--font-mark); font-size:26px; font-weight:700; }
+.ring-sub{ fill:var(--ink-dim); font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.1em; }
+.storage-ring-cap{ text-align:center; font-size:12px; line-height:1.6; }
+.storage-ring-cap .mono{ color:#fff; }
+.storage-bars{ display:flex; flex-direction:column; gap:12px; }
+.sbar-top{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.sbar-top .mono{ color:var(--ink); }
+.sbar-track{ height:8px; background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden; }
+.sbar-fill{ height:100%; border-radius:999px; background:var(--petrol-bright); transition:width .4s ease; }
+.sbar-fill.warn{ background:var(--gold); } .sbar-fill.crit{ background:var(--crit); }
+
+/* specs */
+.spec-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px 24px; }
+.spec-grid > div{ display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--navy-line); font-size:13px; }
+.spec-k{ color:var(--ink-dim); }
+.panel h2{ margin:0 0 14px; font-family:var(--font-mark); font-size:16px; color:#fff; }
+
+@media (max-width:760px){
+  .charts{ grid-template-columns:1fr; }
+  .storage-body{ grid-template-columns:1fr; justify-items:center; }
+  .storage-bars{ width:100%; }
+}

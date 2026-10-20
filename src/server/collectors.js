@@ -83,28 +83,85 @@ async function pm2() {
   }));
 }
 
-// nginx: parse sites-enabled for server_name + proxy_pass (the routing map),
-// and check each site's TLS cert expiry. Best-effort text parsing for v1.
+// nginx: build the routing map (server_name -> upstream) + TLS cert expiry.
+// Scans the usual config locations — nginx.conf, conf.d/*.conf and
+// sites-enabled/* — and splits each file into balanced `server { }` blocks so
+// one row = one virtual host, however the configs are organised. Best-effort
+// text parsing; degrades to an empty list if nginx isn't present.
 async function nginx(sitesDir) {
   const result = { sites: [] };
-  let files = [];
-  try { files = fs.readdirSync(sitesDir); } catch { return result; }
+  const files = nginxConfigFiles(sitesDir);
+  if (!files.length) return result;
 
-  for (const f of files) {
+  const certCache = new Map();
+  for (const file of files) {
     let text;
-    try { text = fs.readFileSync(path.join(sitesDir, f), 'utf8'); } catch { continue; }
-    const serverNames = [...text.matchAll(/server_name\s+([^;]+);/g)]
-      .flatMap((m) => m[1].trim().split(/\s+/)).filter((n) => n && n !== '_');
-    const upstreams = [...text.matchAll(/proxy_pass\s+([^;]+);/g)].map((m) => m[1].trim());
-    const certMatch = text.match(/ssl_certificate\s+([^;]+);/);
-    let certExpiry = null;
-    if (certMatch) certExpiry = await certExpiryDays(certMatch[1].trim());
+    try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
+    text = text.replace(/#[^\n]*/g, ''); // strip comments
+    for (const block of serverBlocks(text)) {
+      const serverNames = [...block.matchAll(/server_name\s+([^;]+);/g)]
+        .flatMap((m) => m[1].trim().split(/\s+/)).filter((n) => n && n !== '_');
+      const upstreams = [...block.matchAll(/proxy_pass\s+([^;]+);/g)]
+        .map((m) => m[1].trim()).filter((u) => !u.includes('/__gate') && !u.includes('/gate/verify'));
+      if (!serverNames.length) continue; // skip catch-all / internal blocks
 
-    if (serverNames.length || upstreams.length) {
-      result.sites.push({ file: f, serverNames, upstreams, certExpiryDays: certExpiry });
+      const certMatch = block.match(/ssl_certificate\s+([^;]+);/);
+      let certExpiry = null;
+      if (certMatch) {
+        const p = certMatch[1].trim();
+        if (!certCache.has(p)) certCache.set(p, await certExpiryDays(p));
+        certExpiry = certCache.get(p);
+      }
+      result.sites.push({
+        file: path.basename(file),
+        serverNames,
+        upstreams: [...new Set(upstreams)],
+        certExpiryDays: certExpiry,
+      });
     }
   }
+  // de-duplicate by server_name set (same vhost seen twice)
+  const seen = new Set();
+  result.sites = result.sites.filter((s) => {
+    const k = s.serverNames.join(',');
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   return result;
+}
+
+// Candidate nginx config files, in a sensible order.
+function nginxConfigFiles(sitesDir) {
+  const files = [];
+  const push = (p) => { try { if (fs.statSync(p).isFile()) files.push(p); } catch {} };
+  push('/etc/nginx/nginx.conf');
+  for (const dir of ['/etc/nginx/conf.d', sitesDir]) {
+    try {
+      for (const f of fs.readdirSync(dir)) push(path.join(dir, f));
+    } catch {}
+  }
+  return files;
+}
+
+// Yield the contents of each top-level `server { ... }` block via brace depth.
+function serverBlocks(text) {
+  const blocks = [];
+  const re = /server\s*\{/g;
+  let m;
+  while ((m = re.exec(text))) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    const start = i;
+    while (i < text.length && depth > 0) {
+      const c = text[i];
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+      i++;
+    }
+    blocks.push(text.slice(start, i - 1));
+  }
+  return blocks;
 }
 
 async function certExpiryDays(certPath) {
