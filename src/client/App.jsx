@@ -2,6 +2,7 @@ import { usePath } from './router.js';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Settings from './pages/Settings.jsx';
+import Logs from './pages/Logs.jsx';
 
 // Ambient background — same petrol/blue orbs + noise as it.omranisystems.com.
 function Background() {
@@ -29,7 +30,7 @@ export default function App() {
   return (
     <>
       <Background />
-      {path === '/settings' ? <Settings /> : <Dashboard />}
+      {path === '/settings' ? <Settings /> : path === '/logs' ? <Logs /> : <Dashboard />}
     </>
   );
 }

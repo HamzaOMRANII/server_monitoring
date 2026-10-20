@@ -11,6 +11,7 @@ function Header() {
       </div>
       <nav>
         <a href="/" onClick={go('/')}>Dashboard</a>
+        <a href="/logs" onClick={go('/logs')}>Logs</a>
         <a href="/settings" className="active" onClick={go('/settings')}>Settings</a>
         <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
       </nav>

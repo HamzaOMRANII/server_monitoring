@@ -9,6 +9,8 @@ const store = require('./store');
 const alerts = require('./alerts');
 const settings = require('./settings');
 const notifier = require('./notifier');
+const actions = require('./actions');
+const logs = require('./logs');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -58,6 +60,35 @@ async function handle(req, res, pathname, ctx) {
   }
   if (pathname === '/api/settings/test-email' && method === 'POST') {
     const result = await notifier.sendTest(settings.get().receivers);
+    return sendJson(res, result.ok ? 200 : 400, result);
+  }
+
+  // --- Logs (read-only) ---
+  if (pathname === '/api/logs/sources' && method === 'GET') {
+    return sendJson(res, 200, { sources: logs.publicSources(await logs.sources()) });
+  }
+  if (pathname === '/api/logs/tail' && method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const result = await logs.tail(url.searchParams.get('source'),
+      url.searchParams.get('lines'), url.searchParams.get('q') || '');
+    return sendJson(res, result.error ? 404 : 200, result);
+  }
+
+  // --- Console: scoped, allow-listed actions (re-auth with password) ---
+  // "Fill the password before starting": unlock verifies the password; the
+  // client then sends it with each run, and the server re-verifies every time.
+  if (pathname === '/api/console/unlock' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    if (!auth.checkPassword(body && body.password)) return sendJson(res, 401, { error: 'invalid password' });
+    return sendJson(res, 200, { ok: true });
+  }
+  if (pathname === '/api/actions' && method === 'GET') {
+    return sendJson(res, 200, { actions: actions.list() });
+  }
+  if (pathname === '/api/actions/run' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    if (!auth.checkPassword(body && body.password)) return sendJson(res, 401, { error: 'password required' });
+    const result = await actions.execute(body.id, body.arg);
     return sendJson(res, result.ok ? 200 : 400, result);
   }
 

@@ -26,4 +26,12 @@ export const api = {
   getSettings: () => req('GET', '/api/settings'),
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),
+
+  consoleUnlock: (password) => req('POST', '/api/console/unlock', { password }),
+  actions: () => req('GET', '/api/actions'),
+  runAction: (id, arg, password) => req('POST', '/api/actions/run', { id, arg, password }),
+
+  logSources: () => req('GET', '/api/logs/sources'),
+  logTail: (source, lines, q) =>
+    req('GET', `/api/logs/tail?source=${encodeURIComponent(source)}&lines=${lines}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
 };

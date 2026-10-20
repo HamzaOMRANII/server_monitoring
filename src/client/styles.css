@@ -231,3 +231,36 @@ button.secondary{ background: transparent; color: var(--ink); border: 1px solid 
   .storage-body{ grid-template-columns:1fr; justify-items:center; }
   .storage-bars{ width:100%; }
 }
+
+/* ===================== log viewer ===================== */
+.logs-panel{ padding:0; overflow:hidden; }
+.logs-bar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:14px 16px; border-bottom:1px solid var(--navy-line); }
+.logs-bar select, .logs-search{ padding:8px 10px; background:var(--tile); color:var(--ink); border:1px solid var(--navy-line); border-radius:8px; font-family:var(--font-body); font-size:13px; }
+.logs-search{ flex:1; min-width:140px; font-family:var(--font-mono); }
+.logs-auto{ margin-bottom:0; }
+.logs-meta{ font-family:var(--font-mono); font-size:12px; margin-left:auto; }
+.logs-view{ height:62vh; overflow:auto; padding:10px 14px; background:#05060a; font-family:var(--font-mono); font-size:12.5px; line-height:1.5; }
+.logs-line{ white-space:pre-wrap; word-break:break-word; color:var(--ink-muted); }
+.logs-line.lg-err{ color:#ff8f8f; }
+.logs-line.lg-warn{ color:var(--gold); }
+.logs-line.lg-dim{ color:var(--ink-dim); }
+.logs-empty{ padding:20px 0; }
+
+/* ===================== console / actions (if wired) ===================== */
+.tabs{ display:flex; gap:8px; margin-bottom:4px; }
+.tab{ background:transparent; color:var(--ink-muted); border:1px solid var(--navy-line); padding:8px 16px; border-radius:999px; font-family:var(--font-mono); font-size:13px; }
+.tab.on{ background:var(--petrol-bright); color:var(--navy-950); border-color:transparent; }
+.unlock{ max-width:460px; }
+.unlock input{ margin:8px 0; }
+.actions{ display:flex; flex-direction:column; gap:16px; }
+.action-row{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+.action-row select{ padding:9px 11px; background:var(--tile); color:var(--ink); border:1px solid var(--navy-line); border-radius:8px; font-family:var(--font-mono); }
+.action-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+.out{ background:#05060a; }
+.out-head{ font-family:var(--font-mono); font-size:12px; color:var(--petrol-bright); margin-bottom:8px; }
+.out.out-err .out-head{ color:var(--crit); }
+.out pre{ margin:0; font-family:var(--font-mono); font-size:12.5px; color:var(--ink-muted); white-space:pre-wrap; word-break:break-word; max-height:360px; overflow:auto; }
+.term-panel{ padding:0; }
+.term-status{ padding:10px 14px; border-bottom:1px solid var(--navy-line); font-family:var(--font-mono); font-size:12px; color:var(--ink-muted); }
+.live-dot.off{ background:var(--ink-dim); animation:none; }
+.term-mount{ height:62vh; padding:6px; background:#05060a; }
