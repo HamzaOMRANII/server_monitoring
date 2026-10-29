@@ -24,6 +24,7 @@ const { load, ROOT } = require('./server/config');
 const authFactory = require('./server/auth');
 const settings = require('./server/settings');
 const sampler = require('./server/sampler');
+const uptime = require('./server/uptime');
 const api = require('./server/api');
 const { sendText } = require('./server/http-util');
 
@@ -31,6 +32,7 @@ const cfg = load();
 settings.seedFrom(cfg);
 const auth = authFactory.create(cfg);
 const serverName = sampler.start(cfg); // begin sampling this box immediately
+uptime.start(settings.get); // site uptime + certificate checks
 
 const PORT = cfg.central.port || 16000;
 const HOST = cfg.central.host || '127.0.0.1';

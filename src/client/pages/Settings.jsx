@@ -11,6 +11,7 @@ function Header() {
       </div>
       <nav>
         <a href="/" onClick={go('/')}>Dashboard</a>
+        <a href="/uptime" onClick={go('/uptime')}>Uptime</a>
         <a href="/logs" onClick={go('/logs')}>Logs</a>
         <a href="/settings" className="active" onClick={go('/settings')}>Settings</a>
         <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
@@ -31,10 +32,16 @@ export default function Settings() {
   const [smtpPass, setSmtpPass] = useState('');
   const [saved, setSaved] = useState('');
   const [testMsg, setTestMsg] = useState('');
+  const [uptime, setUptime] = useState(null);
 
   useEffect(() => {
     api.getSettings().then((s) => {
-      setRules(s.alertRules || {});
+      setRules({ siteDown: { enabled: true, failures: 2, remindMinutes: 30 }, sslExpiry: { enabled: true, days: 14, remindMinutes: 1440 }, ...(s.alertRules || {}) });
+      const u = s.uptime || {};
+      setUptime({
+        intervalSeconds: u.intervalSeconds ?? 60, timeoutSeconds: u.timeoutSeconds ?? 10,
+        extraUrls: (u.extraUrls || []).join('\n'), tlsEndpoints: (u.tlsEndpoints || []).join('\n'), ignore: (u.ignore || []).join('\n'),
+      });
       const em = (s.receivers && s.receivers.email) || {};
       setEmail({
         enabled: !!em.enabled,
@@ -45,7 +52,7 @@ export default function Settings() {
     }).catch(() => {});
   }, []);
 
-  if (!rules || !email) return (<><Header /><main className="wrap"><div className="panel">Loading…</div></main></>);
+  if (!rules || !email || !uptime) return (<><Header /><main className="wrap"><div className="panel">Loading…</div></main></>);
 
   function setRule(key, field, value) {
     setRules((r) => ({ ...r, [key]: { ...r[key], [field]: value } }));
@@ -58,6 +65,10 @@ export default function Settings() {
     e.preventDefault();
     const patch = {
       alertRules: rules,
+      uptime: {
+        intervalSeconds: Number(uptime.intervalSeconds), timeoutSeconds: Number(uptime.timeoutSeconds),
+        extraUrls: uptime.extraUrls, tlsEndpoints: uptime.tlsEndpoints, ignore: uptime.ignore,
+      },
       receivers: {
         email: {
           enabled: email.enabled,
@@ -116,6 +127,43 @@ export default function Settings() {
                 </div>
               );
             })}
+          </section>
+
+          <section className="panel form-card">
+            <h2>Uptime &amp; certificates</h2>
+            <p className="muted">Every site in the nginx config is checked automatically (public URL + its app). Add other URLs or TLS ports below.</p>
+            <div className="rule-row">
+              <label className="toggle">
+                <input type="checkbox" checked={!!rules.siteDown.enabled} onChange={(e) => setRule('siteDown', 'enabled', e.target.checked)} />
+                <span>Site down</span>
+              </label>
+              <label className="field"><span>After failed checks</span>
+                <input type="number" min="1" value={rules.siteDown.failures ?? ''} onChange={(e) => setRule('siteDown', 'failures', Number(e.target.value))} /></label>
+              <label className="field"><span>Remind every (min)</span>
+                <input type="number" value={rules.siteDown.remindMinutes ?? ''} onChange={(e) => setRule('siteDown', 'remindMinutes', Number(e.target.value))} /></label>
+            </div>
+            <div className="rule-row">
+              <label className="toggle">
+                <input type="checkbox" checked={!!rules.sslExpiry.enabled} onChange={(e) => setRule('sslExpiry', 'enabled', e.target.checked)} />
+                <span>Certificate expiry</span>
+              </label>
+              <label className="field"><span>Days left ≤</span>
+                <input type="number" min="1" value={rules.sslExpiry.days ?? ''} onChange={(e) => setRule('sslExpiry', 'days', Number(e.target.value))} /></label>
+              <label className="field"><span>Remind every (min)</span>
+                <input type="number" value={rules.sslExpiry.remindMinutes ?? ''} onChange={(e) => setRule('sslExpiry', 'remindMinutes', Number(e.target.value))} /></label>
+            </div>
+            <div className="row">
+              <label className="field"><span>Check every (s)</span>
+                <input type="number" min="30" value={uptime.intervalSeconds} onChange={(e) => setUptime({ ...uptime, intervalSeconds: e.target.value })} /></label>
+              <label className="field"><span>Timeout (s)</span>
+                <input type="number" min="2" max="30" value={uptime.timeoutSeconds} onChange={(e) => setUptime({ ...uptime, timeoutSeconds: e.target.value })} /></label>
+            </div>
+            <label className="field"><span>Extra URLs (one per line)</span>
+              <textarea rows={3} value={uptime.extraUrls} placeholder="https://example.com/health" onChange={(e) => setUptime({ ...uptime, extraUrls: e.target.value })} /></label>
+            <label className="field"><span>Extra TLS endpoints, host:port (certificate only)</span>
+              <textarea rows={2} value={uptime.tlsEndpoints} placeholder="turn.example.com:5349" onChange={(e) => setUptime({ ...uptime, tlsEndpoints: e.target.value })} /></label>
+            <label className="field"><span>Ignored (one per line; also toggled from the Uptime page)</span>
+              <textarea rows={2} value={uptime.ignore} onChange={(e) => setUptime({ ...uptime, ignore: e.target.value })} /></label>
           </section>
 
           <section className="panel form-card">

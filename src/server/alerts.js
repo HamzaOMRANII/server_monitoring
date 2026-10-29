@@ -19,7 +19,8 @@ const state = new Map(); // key -> { state, since, lastNotified, detail }
 const keyFor = (server, rule, target) => `${server}::${rule}::${target || '-'}`;
 const now = () => Date.now();
 
-async function evaluate({ server, rule, target, value, threshold, remindMinutes, settings, describe }) {
+// `subjects` ({ fire, still, recover }) overrides the default email subjects.
+async function evaluate({ server, rule, target, value, threshold, remindMinutes, settings, describe, subjects = {} }) {
   const key = keyFor(server, rule, target);
   const prev = state.get(key) || { state: 'OK', since: null, lastNotified: 0 };
   const over = value >= threshold;
@@ -27,7 +28,7 @@ async function evaluate({ server, rule, target, value, threshold, remindMinutes,
   if (over && prev.state === 'OK') {
     state.set(key, { state: 'FIRING', since: now(), lastNotified: now(), detail: describe(value) });
     await notify(settings.receivers, {
-      subject: `🔴 ${server}: ${rule}${target ? ` (${target})` : ''} over threshold`,
+      subject: subjects.fire || `🔴 ${server}: ${rule}${target ? ` (${target})` : ''} over threshold`,
       text: `${describe(value)} — threshold ${threshold}.`,
     });
     return;
@@ -40,7 +41,7 @@ async function evaluate({ server, rule, target, value, threshold, remindMinutes,
       prev.detail = describe(value);
       state.set(key, prev);
       await notify(settings.receivers, {
-        subject: `🔴 (still) ${server}: ${rule}${target ? ` (${target})` : ''} over threshold`,
+        subject: subjects.still || `🔴 (still) ${server}: ${rule}${target ? ` (${target})` : ''} over threshold`,
         text: `${describe(value)} — threshold ${threshold}. Firing since ${new Date(prev.since).toISOString()}.`,
       });
     }
@@ -50,7 +51,7 @@ async function evaluate({ server, rule, target, value, threshold, remindMinutes,
   if (!over && prev.state === 'FIRING') {
     state.set(key, { state: 'OK', since: now(), lastNotified: 0, detail: null });
     await notify(settings.receivers, {
-      subject: `🟢 ${server}: ${rule}${target ? ` (${target})` : ''} recovered`,
+      subject: subjects.recover || `🟢 ${server}: ${rule}${target ? ` (${target})` : ''} recovered`,
       text: `${describe(value)} — back under threshold ${threshold}.`,
     });
   }
@@ -101,6 +102,14 @@ async function process(snapshot, settings) {
   }
 }
 
+// Forget a (rule, target) on every server, without notifying: used when a target is ignored.
+function clear(rule, target) {
+  for (const key of state.keys()) {
+    const [, r, t] = key.split('::');
+    if (r === rule && t === (target || '-')) state.delete(key);
+  }
+}
+
 function activeAlerts() {
   const active = [];
   for (const [key, v] of state.entries()) {
@@ -112,4 +121,4 @@ function activeAlerts() {
   return active;
 }
 
-module.exports = { process, activeAlerts };
+module.exports = { process, evaluate, clear, activeAlerts };

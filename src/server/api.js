@@ -11,6 +11,7 @@ const settings = require('./settings');
 const notifier = require('./notifier');
 const actions = require('./actions');
 const logs = require('./logs');
+const uptime = require('./uptime');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -48,6 +49,29 @@ async function handle(req, res, pathname, ctx) {
       disk: round(mainDiskPercent(s)),
     }));
     return sendJson(res, 200, series);
+  }
+
+  // --- Uptime + certificates ---
+  if (pathname === '/api/uptime' && method === 'GET') {
+    return sendJson(res, 200, uptime.view(settings.get()));
+  }
+  if (pathname === '/api/uptime/summary' && method === 'GET') {
+    return sendJson(res, 200, uptime.summary(settings.get()));
+  }
+  if (pathname === '/api/uptime/check' && method === 'POST') {
+    await uptime.runOnce(settings.get());
+    return sendJson(res, 200, uptime.view(settings.get()));
+  }
+  // Ignore / watch one target: { name, ignored }
+  if (pathname === '/api/uptime/ignore' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    const name = String((body && body.name) || '').trim().toLowerCase();
+    if (!name || name.length > 300) return sendJson(res, 400, { error: 'name required' });
+    const cur = new Set((settings.get().uptime && settings.get().uptime.ignore) || []);
+    if (body.ignored) cur.add(name); else cur.delete(name);
+    settings.update({ uptime: { ignore: [...cur] } });
+    await uptime.runOnce(settings.get());
+    return sendJson(res, 200, uptime.view(settings.get()));
   }
 
   if (pathname === '/api/settings' && method === 'GET') {

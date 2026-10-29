@@ -16,6 +16,7 @@ function Header({ server }) {
       </div>
       <nav>
         <a href="/" className="active" onClick={go('/')}>Dashboard</a>
+        <a href="/uptime" onClick={go('/uptime')}>Uptime</a>
         <a href="/logs" onClick={go('/logs')}>Logs</a>
         <a href="/settings" onClick={go('/settings')}>Settings</a>
         <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
@@ -41,17 +42,19 @@ export default function Dashboard() {
   const [server, setServer] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [hist, setHist] = useState([]);
+  const [up, setUp] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let alive = true;
     async function refresh() {
       try {
-        const [m, h] = await Promise.all([api.metrics(), api.history(60)]);
+        const [m, h, u] = await Promise.all([api.metrics(), api.history(60), api.uptimeSummary().catch(() => null)]);
         if (!alive) return;
         setServer(m.server);
         setAlerts(m.alerts || []);
         setHist(h || []);
+        setUp(u);
         setError('');
       } catch (e) {
         if (alive && e.message !== 'unauthorized') setError('Could not reach the monitor.');
@@ -92,8 +95,12 @@ export default function Dashboard() {
             sub={specs.platform || ''} />
           <StatTile label="Apps" value={online} unit={` / ${procs.length}`}
             sub="pm2 online" />
-          <StatTile label="Sites" value={sites.length}
-            sub="nginx server blocks" />
+          <a className="tile-link" href="/uptime" onClick={go('/uptime')}>
+            {up && up.total ? (
+              <StatTile label="Sites up" value={up.up} unit={` / ${up.total}`}
+                sub={up.down.length ? `down: ${up.down.join(', ')}` : up.soonestCert ? `next cert in ${up.soonestCert.days} d` : 'all answering'} />
+            ) : <StatTile label="Sites" value={sites.length} sub="nginx server blocks" />}
+          </a>
         </section>
 
         <section className="charts">

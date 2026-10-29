@@ -39,6 +39,7 @@ function get() {
 function update(patch) {
   if (patch.alertRules) current.alertRules = mergeRules(current.alertRules, patch.alertRules);
   if (patch.receivers) current.receivers = mergeReceivers(current.receivers, patch.receivers);
+  if (patch.uptime) current.uptime = cleanUptime({ ...(current.uptime || {}), ...patch.uptime });
   persist();
   return current;
 }
@@ -71,6 +72,19 @@ function mergeReceivers(base, incoming) {
     }
   }
   return out;
+}
+
+// Uptime check options: numbers clamped, lists trimmed and de-duplicated.
+function cleanUptime(u) {
+  const list = (v) => [...new Set((Array.isArray(v) ? v : String(v || '').split(/[\s,]+/)).map((x) => String(x).trim()).filter(Boolean))].slice(0, 100);
+  const num = (v, min, max, dflt) => Math.min(max, Math.max(min, Number(v) || dflt));
+  return {
+    intervalSeconds: num(u.intervalSeconds, 30, 3600, 60),
+    timeoutSeconds: num(u.timeoutSeconds, 2, 30, 10),
+    ignore: list(u.ignore).map((x) => x.toLowerCase()),
+    extraUrls: list(u.extraUrls).filter((x) => /^https?:\/\//i.test(x)),
+    tlsEndpoints: list(u.tlsEndpoints).filter((x) => /^[a-z0-9.-]+:\d{1,5}$/i.test(x)),
+  };
 }
 
 // Redacted copy safe to send to the browser (no secrets).

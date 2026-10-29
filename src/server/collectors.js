@@ -94,10 +94,16 @@ async function nginx(sitesDir) {
   if (!files.length) return result;
 
   const certCache = new Map();
+  let globalCert = null; // ssl_certificate set once at http{} level, inherited by every block
   for (const file of files) {
     let text;
     try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
     text = text.replace(/#[^\n]*/g, ''); // strip comments
+    if (!globalCert) {
+      const outside = serverBlocks(text).reduce((t, b) => t.replace(b, ''), text);
+      const g = outside.match(/ssl_certificate\s+([^;]+);/);
+      if (g) globalCert = g[1].trim();
+    }
     for (const block of serverBlocks(text)) {
       const serverNames = [...block.matchAll(/server_name\s+([^;]+);/g)]
         .flatMap((m) => m[1].trim().split(/\s+/)).filter((n) => n && n !== '_');
@@ -105,10 +111,12 @@ async function nginx(sitesDir) {
         .map((m) => m[1].trim()).filter((u) => !u.includes('/__gate') && !u.includes('/gate/verify'));
       if (!serverNames.length) continue; // skip catch-all / internal blocks
 
+      const https = /listen\s+[^;]*\b(443|ssl)\b/.test(block);
       const certMatch = block.match(/ssl_certificate\s+([^;]+);/);
       let certExpiry = null;
-      if (certMatch) {
-        const p = certMatch[1].trim();
+      const certPath = certMatch ? certMatch[1].trim() : https ? globalCert : null;
+      if (certPath) {
+        const p = certPath;
         if (!certCache.has(p)) certCache.set(p, await certExpiryDays(p));
         certExpiry = certCache.get(p);
       }
@@ -116,17 +124,22 @@ async function nginx(sitesDir) {
         file: path.basename(file),
         serverNames,
         upstreams: [...new Set(upstreams)],
+        https,
         certExpiryDays: certExpiry,
       });
     }
   }
   // de-duplicate by server_name set (same vhost seen twice)
-  const seen = new Set();
+  // (e.g. a port-80 redirect block + the 443 block): merge what each one adds
+  const seen = new Map();
   result.sites = result.sites.filter((s) => {
     const k = s.serverNames.join(',');
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
+    const first = seen.get(k);
+    if (!first) { seen.set(k, s); return true; }
+    first.https = first.https || s.https;
+    first.upstreams = [...new Set([...first.upstreams, ...s.upstreams])];
+    if (first.certExpiryDays === null) first.certExpiryDays = s.certExpiryDays;
+    return false;
   });
   return result;
 }

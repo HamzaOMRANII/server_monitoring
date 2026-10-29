@@ -138,11 +138,11 @@ code{ font-family: var(--font-mono); font-size: 0.9em; color: var(--petrol-brigh
 .rule-row .toggle{ flex: 1; }
 .rule-row .field{ flex: 1; margin-bottom: 0; }
 
-input[type=text], input[type=password], input[type=number]{
+input[type=text], input[type=password], input[type=number], textarea{
   width: 100%; padding: 10px 12px; background: var(--tile); color: var(--ink);
   border: 1px solid var(--navy-line); border-radius: 10px; font-family: var(--font-body); font-size: 14px;
 }
-input:focus{ outline: 2px solid var(--petrol-bright); outline-offset: 1px; border-color: transparent; }
+input:focus, textarea:focus{ outline: 2px solid var(--petrol-bright); outline-offset: 1px; border-color: transparent; }
 .toggle{ display: flex; align-items: center; gap: 9px; margin-bottom: 14px; cursor: pointer; }
 .toggle input{ width: 16px; height: 16px; accent-color: var(--petrol-bright); }
 
@@ -264,3 +264,29 @@ button.secondary{ background: transparent; color: var(--ink); border: 1px solid 
 .term-status{ padding:10px 14px; border-bottom:1px solid var(--navy-line); font-family:var(--font-mono); font-size:12px; color:var(--ink-muted); }
 .live-dot.off{ background:var(--ink-dim); animation:none; }
 .term-mount{ height:62vh; padding:6px; background:#05060a; }
+
+/* ---- uptime (M1) ---- */
+.panel-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.panel-actions{ display:flex; align-items:center; gap:12px; }
+button.small{ padding:7px 14px; font-size:13px; }
+.link-btn{ background:none; color:var(--ink-muted); padding:2px 6px; font-size:12px; text-decoration:underline; }
+.link-btn:hover{ color:var(--ink); filter:none; }
+.table-scroll{ overflow-x:auto; }
+.table-scroll .t{ min-width:900px; }
+.t a{ color:var(--ink); text-decoration:none; }
+.t a:hover{ text-decoration:underline; }
+.row-down td{ background:color-mix(in srgb, var(--crit) 8%, transparent); }
+.row-ignored td{ opacity:.5; }
+.bad-text{ color:var(--crit); }
+.cert-list{ display:flex; flex-direction:column; gap:2px; }
+.cert-where{ font-size:11px; }
+.strip{ display:inline-flex; align-items:flex-end; gap:1px; height:16px; }
+.strip i{ display:block; width:3px; height:10px; border-radius:1px; background:var(--petrol); }
+.strip i.fail{ height:16px; background:var(--crit); }
+.note{ font-size:12.5px; margin:10px 0 0; line-height:1.5; }
+.tile-link{ color:inherit; text-decoration:none; display:block; }
+.tile-link .tile-stat{ height:100%; }
+.tile-link:hover .tile-stat{ border-color:var(--petrol-bright); }
+textarea{ font-family:var(--font-mono); }
+.table-scroll .t td{ white-space:nowrap; }
+.tile-sub{ overflow-wrap:anywhere; }

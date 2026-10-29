@@ -27,6 +27,11 @@ export const api = {
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),
 
+  uptime: () => req('GET', '/api/uptime'),
+  uptimeSummary: () => req('GET', '/api/uptime/summary'),
+  uptimeCheck: () => req('POST', '/api/uptime/check'),
+  uptimeIgnore: (name, ignored) => req('POST', '/api/uptime/ignore', { name, ignored }),
+
   consoleUnlock: (password) => req('POST', '/api/console/unlock', { password }),
   actions: () => req('GET', '/api/actions'),
   runAction: (id, arg, password) => req('POST', '/api/actions/run', { id, arg, password }),

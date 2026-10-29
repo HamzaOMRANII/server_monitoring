@@ -20,7 +20,16 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
   mount, coloured by usage level.
 - **Apps (pm2)** — status, CPU, memory, uptime, restarts per process.
 - **nginx** — the routing map (server_name → upstream) across `nginx.conf`,
-  `conf.d/` and `sites-enabled/`, with TLS expiry where a per-site cert exists.
+  `conf.d/` and `sites-enabled/`, with TLS expiry (per-site cert or the one set
+  at `http{}` level).
+- **Uptime (`/uptime`)** — every HTTPS site in the nginx config, checked every
+  minute three ways: the public URL (like a visitor; gate/login redirects count
+  as up), the app's upstream directly (catches a crashed app hidden behind an
+  access gate), and certificates (origin via 127.0.0.1:443 + SNI, public edge,
+  plus extra `host:port` TLS endpoints such as coturn). 24 h uptime, last 60
+  checks, Ignore/Watch per site, "Check now". Email alerts: **Site down** after
+  N failed checks, **Certificate expiry** at ≤ N days. Options in Settings
+  (extra URLs, TLS endpoints, ignored hosts, interval, timeout).
 - **Specs** — hostname, platform, CPU, memory, IPs, load average.
 
 ## How it works
