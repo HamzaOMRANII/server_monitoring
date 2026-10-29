@@ -71,16 +71,83 @@ async function pm2() {
   if (!out) return [];
   let list;
   try { list = JSON.parse(out); } catch { return []; }
-  return list.map((p) => ({
+  const tree = procTable();
+  return list.map((p) => {
+    // pm2's own monit reads 0 here (and only sees the npm launcher anyway), so
+    // CPU and memory are measured from /proc over the app's whole process tree.
+    const usage = treeUsage(p.pm_id ?? p.name, p.pid, tree);
+    return {
     name: p.name,
     pid: p.pid,
     status: p.pm2_env && p.pm2_env.status,
     restarts: p.pm2_env && p.pm2_env.restart_time,
     unstableRestarts: p.pm2_env && p.pm2_env.unstable_restarts,
     uptimeMs: p.pm2_env && p.pm2_env.pm_uptime ? Date.now() - p.pm2_env.pm_uptime : null,
-    cpu: p.monit && p.monit.cpu,
-    memoryBytes: p.monit && p.monit.memory,
-  }));
+    cpu: usage ? usage.cpu : p.monit && p.monit.cpu,
+    memoryBytes: usage ? usage.rssBytes : p.monit && p.monit.memory,
+    processes: usage ? usage.count : null,
+    // for the per-app page (M4): where it runs and what it was told to listen on
+    cwd: (p.pm2_env && p.pm2_env.pm_cwd) || null,
+    script: (p.pm2_env && p.pm2_env.pm_exec_path) || null,
+    args: p.pm2_env && Array.isArray(p.pm2_env.args) ? p.pm2_env.args.join(' ') : (p.pm2_env && p.pm2_env.args) || null,
+    execMode: (p.pm2_env && p.pm2_env.exec_mode) || null,
+    nodeVersion: (p.pm2_env && p.pm2_env.node_version) || null,
+    port: portOf(p.pm2_env),
+    errLog: (p.pm2_env && p.pm2_env.pm_err_log_path) || null,
+    outLog: (p.pm2_env && p.pm2_env.pm_out_log_path) || null,
+  };
+  });
+}
+
+// /proc snapshot: pid -> { ppid, ticks (utime+stime), rssPages }. Empty off Linux.
+const CLK_TCK = 100; // getconf CLK_TCK on Linux x86/arm
+const PAGE = 4096;
+function procTable() {
+  const table = new Map();
+  let dirs = [];
+  try { dirs = fs.readdirSync('/proc').filter((d) => /^\d+$/.test(d)); } catch { return table; }
+  for (const d of dirs) {
+    try {
+      const stat = fs.readFileSync(`/proc/${d}/stat`, 'utf8');
+      const f = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      // after "(comm) ": state ppid ... utime(idx 11) stime(12) ... rss(21)
+      table.set(Number(d), { ppid: Number(f[1]), ticks: Number(f[11]) + Number(f[12]), rss: Number(f[21]) });
+    } catch { /* exited */ }
+  }
+  return table;
+}
+
+const lastTicks = new Map(); // app key -> { ticks, at }
+function treeUsage(key, pid, table) {
+  if (!pid || !table.size || !table.has(pid)) return null;
+  const kids = new Map();
+  for (const [p, v] of table) { if (!kids.has(v.ppid)) kids.set(v.ppid, []); kids.get(v.ppid).push(p); }
+  let ticks = 0, rss = 0, count = 0;
+  const stack = [pid];
+  const seen = new Set();
+  while (stack.length) {
+    const p = stack.pop();
+    if (seen.has(p)) continue;
+    seen.add(p);
+    const v = table.get(p);
+    if (!v) continue;
+    ticks += v.ticks; rss += v.rss; count++;
+    for (const c of kids.get(p) || []) stack.push(c);
+  }
+  const now = Date.now();
+  const prev = lastTicks.get(key);
+  lastTicks.set(key, { ticks, at: now });
+  let cpu = 0;
+  if (prev && now > prev.at && ticks >= prev.ticks) cpu = ((ticks - prev.ticks) / CLK_TCK) / ((now - prev.at) / 1000) * 100;
+  return { cpu: Math.round(cpu * 10) / 10, rssBytes: rss * PAGE, count };
+}
+
+// PORT from the process env (pm2 keeps it at the top level and under env).
+function portOf(env) {
+  if (!env) return null;
+  const v = env.PORT ?? (env.env && env.env.PORT);
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 && n < 65536 ? n : null;
 }
 
 // nginx: build the routing map (server_name -> upstream) + TLS cert expiry.

@@ -29,6 +29,8 @@ export const api = {
 
   alertHistory: (days, rule, q) =>
     req('GET', `/api/alerts/history?days=${days}&rule=${encodeURIComponent(rule || '')}&q=${encodeURIComponent(q || '')}`),
+  apps: () => req('GET', '/api/apps'),
+  app: (name, range) => req('GET', `/api/apps/${encodeURIComponent(name)}?range=${range}`),
   uptime: () => req('GET', '/api/uptime'),
   uptimeSummary: () => req('GET', '/api/uptime/summary'),
   uptimeCheck: () => req('POST', '/api/uptime/check'),

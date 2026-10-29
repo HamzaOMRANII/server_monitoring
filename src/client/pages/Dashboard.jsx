@@ -22,6 +22,16 @@ function mainDisk(server) {
   return d.reduce((a, b) => (b.totalBytes > a.totalBytes ? b : a), d[0]);
 }
 
+function AdviceTag({ a }) {
+  if (a.level === 'ok') return <span className="lv-tag lv-ok">ok</span>;
+  return (
+    <span className="advice-tag" title={a.title}>
+      <span className={`lv-tag lv-${a.level}`}>{a.level === 'crit' ? 'problem' : a.level === 'warn' ? 'warning' : 'note'}</span>
+      <span className="advice-short">{a.title}{a.count > 1 ? ` (+${a.count - 1})` : ''}</span>
+    </span>
+  );
+}
+
 const RANGES = [['1h', 'last hour'], ['6h', '6 hours'], ['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days']];
 
 export default function Dashboard() {
@@ -31,7 +41,17 @@ export default function Dashboard() {
   const [range, setRange] = useState('1h');
   const [live, setLive] = useState(true);
   const [up, setUp] = useState(null);
+  const [advice, setAdvice] = useState({});
   const [error, setError] = useState('');
+
+  // Advice per app (worst finding), refreshed every minute.
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.apps().then((a) => { if (alive) setAdvice(a); }).catch(() => {});
+    load();
+    const id = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   // Live: tiles every 5 s; the 1 h chart with them, longer ranges every minute.
   // Paused: nothing refreshes, so a spike can be inspected without it scrolling away.
@@ -124,18 +144,19 @@ export default function Dashboard() {
         <section className="panel">
           <h2>Apps <span className="muted h2-sub">pm2</span></h2>
           <div className="table-scroll"><table className="t">
-            <thead><tr><th>Name</th><th>Status</th><th className="num">CPU</th><th className="num">Mem</th><th className="num">Uptime</th><th className="num">↺</th></tr></thead>
+            <thead><tr><th>Name</th><th>Status</th><th className="num">CPU</th><th className="num">Mem</th><th className="num">Uptime</th><th className="num">↺</th><th>Advice</th></tr></thead>
             <tbody>
               {procs.length ? procs.map((p) => (
-                <tr key={p.name}>
-                  <td className="mono">{p.name}</td>
+                <tr key={p.name} className="clickable" onClick={go(`/apps/${encodeURIComponent(p.name)}`)}>
+                  <td className="mono"><a href={`/apps/${encodeURIComponent(p.name)}`} onClick={go(`/apps/${encodeURIComponent(p.name)}`)}>{p.name}</a></td>
                   <td><span className={`status ${pm2StatusClass(p.status)}`}>{p.status || 'unknown'}</span></td>
                   <td className="num">{p.cpu ?? '—'}%</td>
                   <td className="num">{fmtBytes(p.memoryBytes)}</td>
                   <td className="num">{fmtUptime(p.uptimeMs ? p.uptimeMs / 1000 : null)}</td>
                   <td className="num">{p.restarts ?? '—'}</td>
+                  <td>{advice[p.name] ? <AdviceTag a={advice[p.name]} /> : <span className="muted">…</span>}</td>
                 </tr>
-              )) : <tr><td colSpan={6} className="muted">No pm2 processes.</td></tr>}
+              )) : <tr><td colSpan={7} className="muted">No pm2 processes.</td></tr>}
             </tbody>
           </table></div>
         </section>

@@ -14,6 +14,7 @@ const logs = require('./logs');
 const uptime = require('./uptime');
 const history = require('./history');
 const metrics = require('./metrics');
+const apps = require('./apps');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -53,6 +54,19 @@ async function handle(req, res, pathname, ctx) {
       range, from: Date.now() - 3600e3, to: Date.now(), stepMs: 10000,
       points: rows.map((s) => ({ ts: s.ts, cpu: round(s.cpuPercent), mem: round(s.memPercent), disk: round(mainDiskPercent(s)), load1: s.specs?.loadavg?.[0] ?? null })),
     });
+  }
+
+  // --- Apps (pm2): advice summary + per-app drill-down ---
+  if (pathname === '/api/apps' && method === 'GET') {
+    return sendJson(res, 200, await apps.overview());
+  }
+  if (pathname.startsWith('/api/apps/') && method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const name = decodeURIComponent(pathname.slice('/api/apps/'.length));
+    const range = url.searchParams.get('range') || '24h';
+    if (!metrics.RANGES[range]) return sendJson(res, 400, { error: 'unknown range' });
+    const d = await apps.detail(name, range);
+    return d ? sendJson(res, 200, d) : sendJson(res, 404, { error: 'no such pm2 app' });
   }
 
   // --- Alert history ---

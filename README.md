@@ -20,7 +20,17 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
   tooltip. Kept 90 days; pm2 per-app minutes and uptime checks 30 days.
 - **Storage** — a ring gauge for the main mount plus a used/total bar per
   mount, coloured by usage level.
-- **Apps (pm2)** — status, CPU, memory, uptime, restarts per process.
+- **Apps (pm2)** — status, CPU, memory, uptime, restarts and the worst
+  advice per app. CPU/memory are measured from `/proc` over each app's whole
+  process tree (pm2's own monit reads 0 for `npm start` apps).
+- **Per-app page (`/apps/<name>`)** — CPU/memory over 1 h → 30 d with restarts
+  marked, ports its process tree listens on and the nginx sites routed to it,
+  folder/script/PORT, last error and output log lines (falls back to the
+  newest pm2-logrotate file), and advice with copyable commands: not online,
+  code folder missing, port held by an orphan process, nothing listening on
+  PORT, crash loop (restarts in the last hour + last error line), steady
+  memory growth (least-squares trend since the last restart), high memory/CPU,
+  recent error-log writes, old restart counter.
 - **nginx** — the routing map (server_name → upstream) across `nginx.conf`,
   `conf.d/` and `sites-enabled/`, with TLS expiry (per-site cert or the one set
   at `http{}` level).

@@ -9,7 +9,9 @@ import { fmtTime } from '../format.js';
 //
 // data: [{ ts, v, p? }]   (v may be null for gaps)
 // stepMs: spacing of the points (a jump > 2.5 steps is a gap)
-export default function AreaChart({ data, color, title, unit = '%', max = 100, height = 120, stepMs = 10000, from, to, now }) {
+// max: top of the scale, or 'auto' (rounded up from the data); fmt formats values
+// markers: [{ ts, label }] drawn as dotted vertical lines (e.g. restarts)
+export default function AreaChart({ data, color, title, unit = '%', max = 100, height = 120, stepMs = 10000, from, to, now, fmt, markers = [], markerLabel = 'restart' }) {
   const ref = useRef(null);
   const [hover, setHover] = useState(null);
 
@@ -30,11 +32,13 @@ export default function AreaChart({ data, color, title, unit = '%', max = 100, h
     );
   }
 
+  const top = max === 'auto' ? niceMax(Math.max(...pts.map((d) => Math.max(d.v, d.p ?? 0)))) : max;
+  const show = fmt || ((v) => `${v.toFixed(v < 10 ? 1 : 0)}${unit}`);
   const t0 = from ?? pts[0].ts;
   const t1 = to ?? pts[pts.length - 1].ts;
   const span = Math.max(1, t1 - t0);
   const x = (ts) => padL + ((ts - t0) / span) * plotW;
-  const y = (v) => padT + (1 - Math.min(v, max) / max) * plotH;
+  const y = (v) => padT + (1 - Math.min(v, top) / top) * plotH;
 
   // split into runs wherever two points are further apart than 2.5 steps
   const runs = [];
@@ -65,8 +69,13 @@ export default function AreaChart({ data, color, title, unit = '%', max = 100, h
     <div className="chart">
       <div className="chart-head">
         <span className="chart-title">{title}</span>
-        {hasPeak && <span className="chart-key"><i className="k-avg" style={{ background: color }} />avg <i className="k-peak" style={{ borderColor: color }} />peak</span>}
-        <span className="chart-now" style={{ color }}>{last == null ? '—' : `${last.toFixed(0)}${unit}`}</span>
+        {(hasPeak || markers.length > 0) && (
+          <span className="chart-key">
+            {hasPeak && <><i className="k-avg" style={{ background: color }} />avg <i className="k-peak" style={{ borderColor: color }} />peak</>}
+            {markers.length > 0 && <><i className="k-mark" />{markerLabel}</>}
+          </span>
+        )}
+        <span className="chart-now" style={{ color }}>{last == null ? '—' : show(last)}</span>
       </div>
       <svg
         ref={ref}
@@ -83,11 +92,14 @@ export default function AreaChart({ data, color, title, unit = '%', max = 100, h
             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        {[0, 25, 50, 75, 100].map((g) => (
-          <g key={g}>
-            <line x1={padL} y1={y(g)} x2={W - padR} y2={y(g)} className="chart-grid" />
-            <text x={padL - 6} y={y(g) + 3} className="chart-axis" textAnchor="end">{g}</text>
+        {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+          <g key={f}>
+            <line x1={padL} y1={y(top * f)} x2={W - padR} y2={y(top * f)} className="chart-grid" />
+            <text x={padL - 6} y={y(top * f) + 3} className="chart-axis" textAnchor="end">{fmt ? fmt(top * f, true) : top < 10 ? (top * f).toFixed(top * f % 1 ? 1 : 0) : Math.round(top * f)}</text>
           </g>
+        ))}
+        {markers.filter((m) => m.ts >= t0 && m.ts <= t1).map((m) => (
+          <line key={m.ts} x1={x(m.ts)} y1={padT} x2={x(m.ts)} y2={padT + plotH} className="chart-marker"><title>{m.label}</title></line>
         ))}
         {runs.map((run, i) => (
           <g key={i}>
@@ -108,11 +120,19 @@ export default function AreaChart({ data, color, title, unit = '%', max = 100, h
       </div>
       {hover && (
         <div className="chart-tip">
-          <strong style={{ color }}>{hover.v.toFixed(1)}{unit}</strong>
-          {typeof hover.p === 'number' && <span> · peak {hover.p.toFixed(1)}{unit}</span>}
+          <strong style={{ color }}>{fmt ? fmt(hover.v) : `${hover.v.toFixed(1)}${unit}`}</strong>
+          {typeof hover.p === 'number' && <span> · peak {fmt ? fmt(hover.p) : `${hover.p.toFixed(1)}${unit}`}</span>}
           <span className="muted"> · {tipFmt(hover.ts)}</span>
         </div>
       )}
     </div>
   );
+}
+
+// 0.73 -> 1, 37 -> 40, 412 -> 500, 1.3e9 -> 1.5e9: a round top for the scale.
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (v * 1.05 <= m * p) return m * p;
+  return 10 * p;
 }
