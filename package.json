@@ -11,7 +11,7 @@
     "agent": "node agent/agent.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "dependencies": {
     "nodemailer": "^6.9.14",

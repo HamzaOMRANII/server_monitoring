@@ -31,6 +31,7 @@ const { sendText } = require('./server/http-util');
 const cfg = load();
 settings.seedFrom(cfg);
 const auth = authFactory.create(cfg);
+require('./server/alerts').resume(); // firing alerts survive a restart (alert history)
 const serverName = sampler.start(cfg); // begin sampling this box immediately
 uptime.start(settings.get); // site uptime + certificate checks
 

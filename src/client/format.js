@@ -24,3 +24,18 @@ export function level(pct) {
   if (pct >= 75) return 'warn';
   return 'ok';
 }
+
+// 95 000 ms -> "1m 35s"; 3 h 20 m -> "3h 20m"; 2 d 4 h -> "2d 4h".
+export function fmtDuration(ms) {
+  if (ms === null || ms === undefined) return '—';
+  const s = Math.max(0, Math.round(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+export function fmtDateTime(ts) {
+  return new Date(ts).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}

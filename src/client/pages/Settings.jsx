@@ -1,24 +1,7 @@
 import { useEffect, useState } from 'react';
+import Header from '../components/Header.jsx';
 import { api } from '../api.js';
-import { go } from '../router.js';
 
-function Header() {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="w-it">mon</span><span className="w-light">itoring</span>
-        <span className="brand-sub">settings</span>
-      </div>
-      <nav>
-        <a href="/" onClick={go('/')}>Dashboard</a>
-        <a href="/uptime" onClick={go('/uptime')}>Uptime</a>
-        <a href="/logs" onClick={go('/logs')}>Logs</a>
-        <a href="/settings" className="active" onClick={go('/settings')}>Settings</a>
-        <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
-      </nav>
-    </header>
-  );
-}
 
 const RULES = [
   ['cpuPercent', 'CPU %'],
@@ -52,7 +35,7 @@ export default function Settings() {
     }).catch(() => {});
   }, []);
 
-  if (!rules || !email || !uptime) return (<><Header /><main className="wrap"><div className="panel">Loading…</div></main></>);
+  if (!rules || !email || !uptime) return (<><Header active="/settings" sub="settings" /><main className="wrap"><div className="panel">Loading…</div></main></>);
 
   function setRule(key, field, value) {
     setRules((r) => ({ ...r, [key]: { ...r[key], [field]: value } }));
@@ -102,7 +85,7 @@ export default function Settings() {
 
   return (
     <>
-      <Header />
+      <Header active="/settings" sub="settings" />
       <main className="wrap">
         <form onSubmit={save}>
           <section className="panel form-card">

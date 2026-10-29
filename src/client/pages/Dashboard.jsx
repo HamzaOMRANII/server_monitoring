@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Header from '../components/Header.jsx';
 import { api } from '../api.js';
 import { go } from '../router.js';
 import { fmtBytes, fmtUptime } from '../format.js';
@@ -7,23 +8,6 @@ import StatTile from '../components/StatTile.jsx';
 import AreaChart from '../components/AreaChart.jsx';
 import StoragePanel from '../components/StoragePanel.jsx';
 
-function Header({ server }) {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="w-it">mon</span><span className="w-light">itoring</span>
-        {server && <span className="brand-sub"><span className="live-dot" /> {server.specs?.hostname || server.server}</span>}
-      </div>
-      <nav>
-        <a href="/" className="active" onClick={go('/')}>Dashboard</a>
-        <a href="/uptime" onClick={go('/uptime')}>Uptime</a>
-        <a href="/logs" onClick={go('/logs')}>Logs</a>
-        <a href="/settings" onClick={go('/settings')}>Settings</a>
-        <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
-      </nav>
-    </header>
-  );
-}
 
 function pm2StatusClass(s) {
   s = (s || '').toLowerCase();
@@ -66,7 +50,7 @@ export default function Dashboard() {
   }, []);
 
   if (!server) {
-    return (<><Header /><main className="wrap"><div className="panel">{error || 'Collecting first sample…'}</div></main></>);
+    return (<><Header active="/" /><main className="wrap"><div className="panel">{error || 'Collecting first sample…'}</div></main></>);
   }
 
   const specs = server.specs || {};
@@ -79,7 +63,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Header server={server} />
+      <Header active="/" live sub={server.specs?.hostname || server.server} />
       <main className="wrap">
         <AlertBanner alerts={alerts} />
         {error && <div className="panel panel-danger">{error}</div>}
@@ -112,7 +96,7 @@ export default function Dashboard() {
 
         <section className="panel">
           <h2>Apps <span className="muted h2-sub">pm2</span></h2>
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Name</th><th>Status</th><th className="num">CPU</th><th className="num">Mem</th><th className="num">Uptime</th><th className="num">↺</th></tr></thead>
             <tbody>
               {procs.length ? procs.map((p) => (
@@ -126,12 +110,12 @@ export default function Dashboard() {
                 </tr>
               )) : <tr><td colSpan={6} className="muted">No pm2 processes.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
 
         <section className="panel">
           <h2>nginx <span className="muted h2-sub">sites</span></h2>
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Server name</th><th>Upstream</th><th className="num">TLS</th></tr></thead>
             <tbody>
               {sites.length ? sites.map((s, i) => {
@@ -150,7 +134,7 @@ export default function Dashboard() {
                 );
               }) : <tr><td colSpan={3} className="muted">No nginx sites found.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
 
         <section className="panel specs">

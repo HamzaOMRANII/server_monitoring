@@ -12,6 +12,7 @@ const notifier = require('./notifier');
 const actions = require('./actions');
 const logs = require('./logs');
 const uptime = require('./uptime');
+const history = require('./history');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -49,6 +50,17 @@ async function handle(req, res, pathname, ctx) {
       disk: round(mainDiskPercent(s)),
     }));
     return sendJson(res, 200, series);
+  }
+
+  // --- Alert history ---
+  if (pathname === '/api/alerts/history' && method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const days = Number(url.searchParams.get('days'));
+    return sendJson(res, 200, history.query({
+      days: [1, 7, 30, 90, 0].includes(days) ? days : 7,
+      rule: (url.searchParams.get('rule') || '').slice(0, 40),
+      q: (url.searchParams.get('q') || '').slice(0, 100),
+    }));
   }
 
   // --- Uptime + certificates ---

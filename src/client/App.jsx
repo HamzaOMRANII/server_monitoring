@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Settings from './pages/Settings.jsx';
 import Logs from './pages/Logs.jsx';
 import Uptime from './pages/Uptime.jsx';
+import Alerts from './pages/Alerts.jsx';
 
 // Ambient background — same petrol/blue orbs + noise as it.omranisystems.com.
 function Background() {
@@ -31,7 +32,7 @@ export default function App() {
   return (
     <>
       <Background />
-      {path === '/settings' ? <Settings /> : path === '/logs' ? <Logs /> : path === '/uptime' ? <Uptime /> : <Dashboard />}
+      {path === '/settings' ? <Settings /> : path === '/logs' ? <Logs /> : path === '/uptime' ? <Uptime /> : path === '/alerts' ? <Alerts /> : <Dashboard />}
     </>
   );
 }

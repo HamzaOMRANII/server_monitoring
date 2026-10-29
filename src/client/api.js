@@ -27,6 +27,8 @@ export const api = {
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),
 
+  alertHistory: (days, rule, q) =>
+    req('GET', `/api/alerts/history?days=${days}&rule=${encodeURIComponent(rule || '')}&q=${encodeURIComponent(q || '')}`),
   uptime: () => req('GET', '/api/uptime'),
   uptimeSummary: () => req('GET', '/api/uptime/summary'),
   uptimeCheck: () => req('POST', '/api/uptime/check'),

@@ -1,5 +1,7 @@
 # Installing the monitor on a new server
 
+Requires **Node.js 22.5+** (built-in `node:sqlite`), pm2 and optionally nginx.
+
 This is a **single-server** app: it monitors the box it runs on and shows only
 that box. To watch another server, install a separate instance on that server.
 There is no central/fleet view by design.

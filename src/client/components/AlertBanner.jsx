@@ -1,10 +1,7 @@
+import { RULE_LABELS } from '../pages/Alerts.jsx';
+import { go } from '../router.js';
 // Top-of-dashboard banner: red glass when something is firing, quiet when all
 // is clear. Reuses the portfolio's panel-danger glow.
-const RULE_LABELS = {
-  cpuPercent: 'CPU', memPercent: 'RAM', diskPercent: 'Disk', pm2Restart: 'pm2 restarts',
-  siteDown: 'Site down', sslExpiry: 'Certificate expiry',
-};
-
 export default function AlertBanner({ alerts }) {
   const firing = alerts && alerts.length > 0;
   return (
@@ -20,7 +17,7 @@ export default function AlertBanner({ alerts }) {
           ))}
         </ul>
       ) : (
-        <p className="muted">No alerts firing on this server.</p>
+        <p className="muted">No alerts firing on this server. <a href="/alerts" onClick={go('/alerts')}>Alert history →</a></p>
       )}
     </div>
   );

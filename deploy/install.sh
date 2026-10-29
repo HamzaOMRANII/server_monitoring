@@ -40,7 +40,8 @@ cd "$REPO"
 echo "==> repo: $REPO   name: $NAME   port: $PORT   domain: ${DOMAIN:-<none>}"
 
 # --- prerequisites -----------------------------------------------------------
-command -v node >/dev/null || { echo "node is required"; exit 1; }
+command -v node >/dev/null || { echo "node is required (>= 22.5)"; exit 1; }
+node -e "require('node:sqlite')" 2>/dev/null || { echo "node >= 22.5 is required (built-in node:sqlite for the alert history)"; exit 1; }
 command -v npm  >/dev/null || { echo "npm is required"; exit 1; }
 command -v pm2  >/dev/null || { echo "pm2 is required (npm i -g pm2)"; exit 1; }
 

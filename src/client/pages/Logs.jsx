@@ -1,24 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import Header from '../components/Header.jsx';
 import { api } from '../api.js';
-import { go } from '../router.js';
 
-function Header() {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="w-it">mon</span><span className="w-light">itoring</span>
-        <span className="brand-sub">logs</span>
-      </div>
-      <nav>
-        <a href="/" onClick={go('/')}>Dashboard</a>
-        <a href="/uptime" onClick={go('/uptime')}>Uptime</a>
-        <a href="/logs" className="active" onClick={go('/logs')}>Logs</a>
-        <a href="/settings" onClick={go('/settings')}>Settings</a>
-        <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
-      </nav>
-    </header>
-  );
-}
 
 // Colour a line by its log level so errors jump out.
 function lineClass(l) {
@@ -78,7 +61,7 @@ export default function Logs() {
 
   return (
     <>
-      <Header />
+      <Header active="/logs" sub="logs" />
       <main className="wrap">
         <div className="panel logs-panel">
           <div className="logs-bar">

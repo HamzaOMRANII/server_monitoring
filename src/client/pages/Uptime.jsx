@@ -1,26 +1,9 @@
 import { useEffect, useState } from 'react';
+import Header from '../components/Header.jsx';
 import { api } from '../api.js';
-import { go } from '../router.js';
 import { fmtTime } from '../format.js';
 import StatTile from '../components/StatTile.jsx';
 
-function Header() {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="w-it">mon</span><span className="w-light">itoring</span>
-        <span className="brand-sub">uptime</span>
-      </div>
-      <nav>
-        <a href="/" onClick={go('/')}>Dashboard</a>
-        <a href="/uptime" className="active" onClick={go('/uptime')}>Uptime</a>
-        <a href="/logs" onClick={go('/logs')}>Logs</a>
-        <a href="/settings" onClick={go('/settings')}>Settings</a>
-        <a href="/login" onClick={async (e) => { e.preventDefault(); await api.logout(); go('/login')(); }}>Sign out</a>
-      </nav>
-    </header>
-  );
-}
 
 // Status always carries a word, never colour alone.
 function State({ t }) {
@@ -89,7 +72,7 @@ export default function Uptime() {
     try { setData(await api.uptimeIgnore(t.name, !t.ignored)); } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
 
-  if (!data) return (<><Header /><main className="wrap"><div className="panel">{error || 'Loading…'}</div></main></>);
+  if (!data) return (<><Header active="/uptime" sub="uptime" /><main className="wrap"><div className="panel">{error || 'Loading…'}</div></main></>);
 
   const active = data.targets.filter((t) => !t.ignored && t.up !== null);
   const down = active.filter((t) => !t.up);
@@ -101,7 +84,7 @@ export default function Uptime() {
 
   return (
     <>
-      <Header />
+      <Header active="/uptime" sub="uptime" />
       <main className="wrap">
         {error && <div className="panel panel-danger">{error}</div>}
         {down.length > 0 && (

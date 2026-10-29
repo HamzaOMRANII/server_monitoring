@@ -30,6 +30,12 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
   checks, Ignore/Watch per site, "Check now". Email alerts: **Site down** after
   N failed checks, **Certificate expiry** at ≤ N days. Options in Settings
   (extra URLs, TLS endpoints, ignored hosts, interval, timeout).
+- **Alert history (`/alerts`)** — every alert episode (fired → recovered or
+  cleared) stored in SQLite (`data/monitoring.db`, Node's built-in
+  `node:sqlite`, kept 180 days): timeline per rule/target, period filter
+  (24 h → all), rule filter, search, totals (alerts, site downtime, mean time
+  to recover, emails sent), most-affected list. Alerts still firing at a
+  restart are resumed without a second email.
 - **Specs** — hostname, platform, CPU, memory, IPs, load average.
 
 ## How it works
