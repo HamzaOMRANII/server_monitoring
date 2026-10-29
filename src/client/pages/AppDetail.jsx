@@ -2,44 +2,12 @@ import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
 import StatTile from '../components/StatTile.jsx';
 import AreaChart from '../components/AreaChart.jsx';
+import Advice from '../components/Advice.jsx';
 import { api } from '../api.js';
 import { go } from '../router.js';
 import { fmtBytes, fmtUptime, fmtDateTime } from '../format.js';
 
 const RANGES = [['1h', 'last hour'], ['6h', '6 hours'], ['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days']];
-const LEVEL_WORD = { crit: 'problem', warn: 'warning', info: 'note', ok: 'ok' };
-
-function Advice({ items }) {
-  return (
-    <div className="advice">
-      {items.map((a, i) => (
-        <div key={i} className={`advice-item lv-${a.level}`}>
-          <div className="advice-head"><span className={`lv-tag lv-${a.level}`}>{LEVEL_WORD[a.level]}</span><strong>{a.title}</strong></div>
-          <p>{a.detail}</p>
-          {a.commands.length > 0 && (
-            <div className="advice-cmds">
-              {a.commands.map((c) => <CopyCmd key={c} cmd={c} />)}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CopyCmd({ cmd }) {
-  const [done, setDone] = useState(false);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(cmd.replace(/\s+#.*$/, '')); setDone(true); setTimeout(() => setDone(false), 1500); } catch { /* no clipboard */ }
-  };
-  return (
-    <div className="cmd">
-      <code>{cmd}</code>
-      <button type="button" className="link-btn" onClick={copy}>{done ? 'copied' : 'copy'}</button>
-    </div>
-  );
-}
-
 function LogBox({ title, lines, rotated }) {
   return (
     <div className="panel">

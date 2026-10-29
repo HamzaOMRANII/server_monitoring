@@ -7,6 +7,7 @@ import { fmtDuration, fmtDateTime } from '../format.js';
 export const RULE_LABELS = {
   cpuPercent: 'CPU', memPercent: 'RAM', diskPercent: 'Disk', pm2Restart: 'pm2 restarts',
   siteDown: 'Site down', sslExpiry: 'Certificate expiry',
+  newPublicPort: 'New public port', sshBruteForce: 'SSH brute force',
 };
 const ruleLabel = (r) => RULE_LABELS[r] || r;
 const PERIODS = [[1, '24 h'], [7, '7 days'], [30, '30 days'], [90, '90 days'], [0, 'All']];

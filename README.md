@@ -48,6 +48,16 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
   (24 h → all), rule filter, search, totals (alerts, site downtime, mean time
   to recover, emails sent), most-affected list. Alerts still firing at a
   restart are resumed without a second email.
+- **Security (`/security`, read-only)** — failed SSH logins per hour (7 d
+  chart) and top attacking addresses with the user names they tried, every
+  successful SSH login (new addresses flagged), listening ports classified
+  against iptables/ip6tables (this server only / Cloudflare only / internet),
+  `sshd -T` settings, fail2ban, pending apt updates, reboot-required, and
+  findings with copyable fix commands. auth.log is read incrementally
+  (position kept across restarts and rotation; first run backfills 7 days).
+  Alerts: new port open to the internet (first run = known baseline; "mark as
+  known" on the page), SSH brute force (failed logins/hour), optional email on
+  every successful SSH login.
 - **Specs** — hostname, platform, CPU, memory, IPs, load average.
 
 ## How it works

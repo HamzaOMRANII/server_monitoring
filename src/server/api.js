@@ -15,6 +15,7 @@ const uptime = require('./uptime');
 const history = require('./history');
 const metrics = require('./metrics');
 const apps = require('./apps');
+const security = require('./security');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -67,6 +68,17 @@ async function handle(req, res, pathname, ctx) {
     if (!metrics.RANGES[range]) return sendJson(res, 400, { error: 'unknown range' });
     const d = await apps.detail(name, range);
     return d ? sendJson(res, 200, d) : sendJson(res, 404, { error: 'no such pm2 app' });
+  }
+
+  // --- Security (read-only) ---
+  if (pathname === '/api/security' && method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    return sendJson(res, 200, await security.view(url.searchParams.get('refresh') === '1'));
+  }
+  if (pathname === '/api/security/known-port' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    if (!security.acknowledgePort(body && body.port)) return sendJson(res, 400, { error: 'port must look like tcp/8080' });
+    return sendJson(res, 200, await security.view());
   }
 
   // --- Alert history ---

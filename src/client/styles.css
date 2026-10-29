@@ -368,3 +368,9 @@ tr.clickable:hover td{ background:rgba(139,168,196,0.05); }
 .specs-wide .spec-grid{ grid-template-columns:repeat(auto-fill, minmax(min(340px, 100%), 1fr)); }
 .specs-wide .spec-grid > div{ gap:12px; }
 .specs-wide .spec-grid .mono{ overflow-wrap:anywhere; text-align:right; }
+
+/* ---- security (M5) ---- */
+.toggle.compact{ margin:0; font-size:13px; }
+details.updates{ margin-top:12px; }
+details.updates summary{ cursor:pointer; color:var(--ink-muted); font-size:13px; }
+.update-list{ margin-top:8px; font-size:12px; line-height:1.7; }

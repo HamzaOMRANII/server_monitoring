@@ -7,6 +7,7 @@ const LINKS = [
   ['/', 'Dashboard'],
   ['/uptime', 'Uptime'],
   ['/alerts', 'Alerts'],
+  ['/security', 'Security'],
   ['/logs', 'Logs'],
   ['/settings', 'Settings'],
 ];

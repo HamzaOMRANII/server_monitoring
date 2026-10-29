@@ -19,7 +19,7 @@ export default function Settings() {
 
   useEffect(() => {
     api.getSettings().then((s) => {
-      setRules({ siteDown: { enabled: true, failures: 2, remindMinutes: 30 }, sslExpiry: { enabled: true, days: 14, remindMinutes: 1440 }, ...(s.alertRules || {}) });
+      setRules({ siteDown: { enabled: true, failures: 2, remindMinutes: 30 }, sslExpiry: { enabled: true, days: 14, remindMinutes: 1440 }, newPublicPort: { enabled: true }, sshBruteForce: { enabled: true, perHour: 1000, remindMinutes: 360 }, sshLogin: { enabled: false }, ...(s.alertRules || {}) });
       const u = s.uptime || {};
       setUptime({
         intervalSeconds: u.intervalSeconds ?? 60, timeoutSeconds: u.timeoutSeconds ?? 10,
@@ -147,6 +147,29 @@ export default function Settings() {
               <textarea rows={2} value={uptime.tlsEndpoints} placeholder="turn.example.com:5349" onChange={(e) => setUptime({ ...uptime, tlsEndpoints: e.target.value })} /></label>
             <label className="field"><span>Ignored (one per line; also toggled from the Uptime page)</span>
               <textarea rows={2} value={uptime.ignore} onChange={(e) => setUptime({ ...uptime, ignore: e.target.value })} /></label>
+          </section>
+
+          <section className="panel form-card">
+            <h2>Security alerts</h2>
+            <p className="muted">From the Security page checks (read-only).</p>
+            <label className="toggle">
+              <input type="checkbox" checked={!!rules.newPublicPort.enabled} onChange={(e) => setRule('newPublicPort', 'enabled', e.target.checked)} />
+              <span>A new port opens to the internet</span>
+            </label>
+            <div className="rule-row">
+              <label className="toggle">
+                <input type="checkbox" checked={!!rules.sshBruteForce.enabled} onChange={(e) => setRule('sshBruteForce', 'enabled', e.target.checked)} />
+                <span>SSH brute force</span>
+              </label>
+              <label className="field"><span>Failed logins per hour ≥</span>
+                <input type="number" min="10" value={rules.sshBruteForce.perHour ?? ''} onChange={(e) => setRule('sshBruteForce', 'perHour', Number(e.target.value))} /></label>
+              <label className="field"><span>Remind every (min)</span>
+                <input type="number" value={rules.sshBruteForce.remindMinutes ?? ''} onChange={(e) => setRule('sshBruteForce', 'remindMinutes', Number(e.target.value))} /></label>
+            </div>
+            <label className="toggle">
+              <input type="checkbox" checked={!!rules.sshLogin.enabled} onChange={(e) => setRule('sshLogin', 'enabled', e.target.checked)} />
+              <span>Email me on every successful SSH login</span>
+            </label>
           </section>
 
           <section className="panel form-card">

@@ -36,6 +36,7 @@ metrics.start(); // metrics history in SQLite
 require('./server/alerts').resume(); // firing alerts survive a restart (alert history)
 const serverName = sampler.start(cfg); // begin sampling this box immediately
 uptime.start(settings.get); // site uptime + certificate checks
+require('./server/security').start(settings.get); // SSH, ports, updates (read-only)
 
 const PORT = cfg.central.port || 16000;
 const HOST = cfg.central.host || '127.0.0.1';

@@ -55,6 +55,24 @@ const MIGRATIONS = [
      PRIMARY KEY (target, ts)
    ) WITHOUT ROWID;
    CREATE INDEX uptime_checks_ts ON uptime_checks(ts);`,
+
+  // 3 — security (M5): failed SSH attempts per hour per IP, successful logins,
+  // and a small key/value table (auth.log read position, port baseline).
+  `CREATE TABLE ssh_fail_hourly (
+     hour  INTEGER NOT NULL,                       -- ms since epoch, start of the hour
+     ip    TEXT NOT NULL,
+     count INTEGER NOT NULL,
+     users TEXT NOT NULL DEFAULT '[]',             -- JSON: up to 8 user names tried
+     PRIMARY KEY (hour, ip)
+   ) WITHOUT ROWID;
+   CREATE TABLE ssh_logins (
+     ts     INTEGER NOT NULL,
+     user   TEXT NOT NULL,
+     ip     TEXT NOT NULL,
+     method TEXT NOT NULL,
+     PRIMARY KEY (ts, user, ip)
+   ) WITHOUT ROWID;
+   CREATE TABLE kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);`,
 ];
 
 let db = null;
