@@ -166,6 +166,28 @@ async function listeners() {
   return rows;
 }
 
+// Ports that open and close on their own and are never a deliberate service:
+// coturn's relay range (calls) and the kernel's ephemeral range (outgoing/temporary sockets).
+function transientRanges() {
+  const ranges = [];
+  try {
+    const conf = fs.readFileSync('/etc/turnserver.conf', 'utf8');
+    const min = Number((conf.match(/^min-port=(\d+)/m) || [])[1]);
+    const max = Number((conf.match(/^max-port=(\d+)/m) || [])[1]);
+    if (min && max) ranges.push({ from: min, to: max, label: 'TURN relay (calls)' });
+  } catch { /* no coturn */ }
+  try {
+    const [a, b] = fs.readFileSync('/proc/sys/net/ipv4/ip_local_port_range', 'utf8').trim().split(/\s+/).map(Number);
+    if (a && b) ranges.push({ from: a, to: b, label: 'temporary port' });
+  } catch { ranges.push({ from: 32768, to: 60999, label: 'temporary port' }); }
+  return ranges;
+}
+const transientOf = (port, ranges) => (ranges.find((r) => port >= r.from && port <= r.to) || {}).label || null;
+
+// A port must be seen open in this many consecutive checks (one a minute) before it counts as new.
+const NEW_PORT_MINUTES = 5;
+const seenOpen = new Map(); // key -> consecutive checks seen
+
 const isLoopback = (a) => /^127\./.test(a) || a === '[::1]' || a === '::1' || a === 'localhost';
 
 // Ports the INPUT chain restricts (jump to a custom chain, DROP/REJECT, or a -s source).
@@ -243,6 +265,19 @@ async function slowChecks(force = false) {
   return slow.data;
 }
 
+// ---------------------------------------------------------------- backup status
+// Written by /projects/system_documentation/ops/omrani-backup.sh after every run.
+const BACKUP_STATUS = process.env.BACKUP_STATUS || '/root/backups/nightly/last.json';
+function backupStatus() {
+  try {
+    const j = JSON.parse(fs.readFileSync(BACKUP_STATUS, 'utf8'));
+    return {
+      present: true, ok: !!j.ok, name: j.name, finishedAt: Date.parse(j.finishedAt) || null, sizeBytes: j.sizeBytes || 0,
+      failed: (j.steps || []).filter((x) => !x.ok).map((x) => x.step), offsite: (j.steps || []).some((x) => x.step === 'offsite' && x.ok),
+    };
+  } catch { return { present: false }; }
+}
+
 // ---------------------------------------------------------------- findings
 function findings(ctx) {
   const out = [];
@@ -277,7 +312,7 @@ function findings(ctx) {
       'Kept open by your choice. RDP is a frequent target; limiting it to your own address (or a VPN) removes almost all of the risk.',
       ['iptables -I INPUT -p tcp --dport 3389 ! -s <your-ip> -j DROP   # example: allow only your IP']);
   }
-  const other = [...new Map(open.filter((p) => ![22, 80, 443, 3389, 3478, 5349].includes(p.port))
+  const other = [...new Map(open.filter((p) => !p.transient && ![22, 80, 443, 3389, 3478, 5349].includes(p.port))
     .map((p) => [`${p.proto}/${p.port}`, p])).values()];
   if (other.length) {
     add('warn', `${other.length} other port(s) open to the internet`,
@@ -300,13 +335,27 @@ function findings(ctx) {
   if (ssh.newLoginIps.length) {
     add('info', `Successful SSH login(s) from new address(es): ${ssh.newLoginIps.join(', ')}`, 'Never seen before this week. If that was not you, change the root password now and check /var/log/auth.log.', []);
   }
+  const bk = ctx.backup;
+  const BK_CMD = 'bash /projects/system_documentation/ops/omrani-backup.sh';
+  if (!bk.present) {
+    add('warn', 'No server backup has run yet', 'Run the backup once, then let it run every night (see 03-backup-plan.md).', [BK_CMD]);
+  } else if (!bk.ok) {
+    add('crit', 'The last server backup failed', `Failed step(s): ${bk.failed.join(', ') || 'unknown'}. Details in /root/backups/nightly/backup.log.`, [BK_CMD]);
+  } else if (bk.finishedAt && Date.now() - bk.finishedAt > 26 * HOUR) {
+    add('crit', `The last server backup is ${Math.floor((Date.now() - bk.finishedAt) / HOUR)} h old`,
+      'Backups should run every night at 03:00. Check that the cron line exists.',
+      ['crontab -l | grep omrani-backup', '( crontab -l; echo "0 3 * * * /projects/system_documentation/ops/omrani-backup.sh >> /root/backups/nightly/backup.log 2>&1" ) | crontab -']);
+  } else if (!bk.offsite) {
+    add('info', 'Backups stay on this server only', 'A copy outside the server (your VM with --fetch-only, or Backblaze B2) protects against losing the whole VPS.', []);
+  }
   if (!out.length) add('ok', 'No issues found', 'SSH, firewall, updates and open ports look fine.', []);
   const order = { crit: 0, warn: 1, info: 2, ok: 3 };
   return out.sort((a, b) => order[a.level] - order[b.level]);
 }
 
 // ---------------------------------------------------------------- view + alerts
-async function snapshot() {
+// `count` = this call is the once-a-minute check (page views must not advance the counter)
+async function snapshot(count = false) {
   const [ls, fw, sl] = await Promise.all([listeners(), firewall(), slowChecks()]);
   const now = Date.now();
   const fails24h = db.get('SELECT COALESCE(SUM(count), 0) AS n, COUNT(DISTINCT ip) AS ips FROM ssh_fail_hourly WHERE hour >= ?', now - DAY);
@@ -338,8 +387,16 @@ async function snapshot() {
   // the first run accepts what is open today as the baseline
   if (!kvGet('knownPorts', null)) kvSet('knownPorts', [...new Set(ports.filter((p) => p.exposure.level === 'internet').map(portKey))]);
   const baseline = new Set(kvGet('knownPorts', []));
-  for (const p of ports) p.known = p.exposure.level !== 'internet' || baseline.has(portKey(p));
-  const newPorts = ports.filter((p) => !p.known);
+  const ranges = transientRanges();
+  for (const p of ports) {
+    p.transient = p.exposure.level === 'internet' ? transientOf(p.port, ranges) : null;
+    p.known = p.exposure.level !== 'internet' || !!p.transient || baseline.has(portKey(p));
+  }
+  // persistence: only ports open for NEW_PORT_MINUTES consecutive checks
+  const unknownNow = new Set(ports.filter((p) => !p.known).map(portKey));
+  for (const k of [...seenOpen.keys()]) if (!unknownNow.has(k)) seenOpen.delete(k);
+  if (count) for (const k of unknownNow) seenOpen.set(k, (seenOpen.get(k) || 0) + 1);
+  const newPorts = ports.filter((p) => !p.known && (seenOpen.get(portKey(p)) || 0) >= NEW_PORT_MINUTES);
 
   const ssh = {
     available: fs.existsSync(AUTH_LOG),
@@ -347,18 +404,20 @@ async function snapshot() {
     perHour, topIps: topIps.map((r) => ({ ...r, users: JSON.parse(r.users || '[]').slice(0, 8) })),
     logins: logins.map((l) => ({ ...l, newIp: isNew(l.ip) })), newLoginIps, historyStart,
   };
-  const ctx = { ssh, sshd: sl.sshd, fail2ban: sl.fail2ban, updates: sl.updates, reboot: sl.reboot, ports, newPorts };
+  const ctx = { backup: backupStatus(), ssh, sshd: sl.sshd, fail2ban: sl.fail2ban, updates: sl.updates, reboot: sl.reboot, ports, newPorts };
   return { checkedAt: now, firewall: { available: fw.available, v4Policy: fw.v4.policy, v6Policy: fw.v6.policy }, ...ctx, findings: findings(ctx) };
 }
 
 async function raise(settings) {
   const cfg = config(settings);
   const server = store.current()?.server || 'server';
-  const snap = await snapshot();
+  const snap = await snapshot(true);
   if (cfg.newPublicPort.enabled) {
     const current = new Set(snap.newPorts.map((p) => `${p.proto}/${p.port}`));
     const firing = new Set(alerts.activeAlerts().filter((a) => a.rule === 'newPublicPort').map((a) => a.target));
     for (const k of new Set([...current, ...firing])) {
+      // closed within the persistence window, or temporary by nature: forget it without an email
+      if (!current.has(k) && !snap.ports.some((x) => `${x.proto}/${x.port}` === k && !x.transient)) { alerts.clear('newPublicPort', k); continue; }
       const p = snap.newPorts.find((x) => `${x.proto}/${x.port}` === k);
       await alerts.evaluate({
         server, rule: 'newPublicPort', target: k, value: current.has(k) ? 1 : 0, threshold: 1, remindMinutes: 24 * 60, settings,

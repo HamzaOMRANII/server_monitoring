@@ -129,7 +129,7 @@ export default function Security() {
                     <td className="mono">{p.proto}/{p.port}</td>
                     <td className="mono">{p.addr}</td>
                     <td className="mono">{p.process}</td>
-                    <td><span className={`lv-tag ${EXPOSURE_CLS[p.exposure.level]}`}>{p.exposure.label}</span></td>
+                    <td><span className={`lv-tag ${EXPOSURE_CLS[p.exposure.level]}`}>{p.exposure.label}</span>{p.transient && <span className="muted cert-where"> · {p.transient}</span>}</td>
                     <td className="num">{!p.known && <button type="button" className="link-btn" onClick={() => markKnown(p)} disabled={busy}>mark as known</button>}</td>
                   </tr>
                 ))}
@@ -150,6 +150,8 @@ export default function Security() {
             <div><span className="spec-k">fail2ban</span><span className={`mono ${d.fail2ban.installed ? '' : 'bad-text'}`}>
               {d.fail2ban.installed ? (d.fail2ban.sshdJail ? `on · ${d.fail2ban.banned} banned now · ${d.fail2ban.totalBanned} total` : 'installed, no sshd jail') : 'not installed'}</span></div>
             <div><span className="spec-k">Reboot</span><span className="mono">{d.reboot?.required ? 'required' : 'not needed'}</span></div>
+            <div><span className="spec-k">Last backup</span><span className={`mono ${d.backup && d.backup.present && d.backup.ok ? '' : 'bad-text'}`}>
+              {!d.backup || !d.backup.present ? 'never' : `${fmtDateTime(d.backup.finishedAt)} · ${(d.backup.sizeBytes / 1048576).toFixed(0)} MB${d.backup.ok ? '' : ' · FAILED'}`}</span></div>
             <div><span className="spec-k">Updates</span><span className="mono">{d.updates ? `${d.updates.total} (${d.updates.security} security)` : '—'}</span></div>
           </div>
           {d.updates && d.updates.packages.length > 0 && (
