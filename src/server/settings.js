@@ -40,6 +40,7 @@ function update(patch) {
   if (patch.alertRules) current.alertRules = mergeRules(current.alertRules, patch.alertRules);
   if (patch.receivers) current.receivers = mergeReceivers(current.receivers, patch.receivers);
   if (patch.uptime) current.uptime = cleanUptime({ ...(current.uptime || {}), ...patch.uptime });
+  if (patch.digest) current.digest = cleanDigest({ ...(current.digest || {}), ...patch.digest });
   persist();
   return current;
 }
@@ -85,6 +86,14 @@ function cleanUptime(u) {
     extraUrls: list(u.extraUrls).filter((x) => /^https?:\/\//i.test(x)),
     tlsEndpoints: list(u.tlsEndpoints).filter((x) => /^[a-z0-9.-]+:\d{1,5}$/i.test(x)),
   };
+}
+
+// Digest schedule: hour 0–23, weekday 0 (Sunday) – 6, a valid IANA time zone.
+function cleanDigest(d) {
+  let timeZone = String(d.timeZone || 'UTC').trim();
+  try { new Intl.DateTimeFormat('en', { timeZone }); } catch { timeZone = 'UTC'; }
+  const int = (v, min, max, dflt) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt; };
+  return { daily: !!d.daily, weekly: !!d.weekly, hour: int(d.hour, 0, 23, 8), weekday: int(d.weekday, 0, 6, 1), timeZone };
 }
 
 // Redacted copy safe to send to the browser (no secrets).

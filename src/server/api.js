@@ -16,6 +16,7 @@ const history = require('./history');
 const metrics = require('./metrics');
 const apps = require('./apps');
 const security = require('./security');
+const digest = require('./digest');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -68,6 +69,22 @@ async function handle(req, res, pathname, ctx) {
     if (!metrics.RANGES[range]) return sendJson(res, 400, { error: 'unknown range' });
     const d = await apps.detail(name, range);
     return d ? sendJson(res, 200, d) : sendJson(res, 404, { error: 'no such pm2 app' });
+  }
+
+  // --- Email digest ---
+  if (pathname === '/api/digest' && method === 'GET') {
+    return sendJson(res, 200, digest.schedule(settings.get()));
+  }
+  if (pathname === '/api/digest/preview' && method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const p = await digest.preview(url.searchParams.get('period') === 'weekly' ? 'weekly' : 'daily', settings.get());
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(p.html);
+  }
+  if (pathname === '/api/digest/send' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    const result = await digest.send(body && body.period === 'weekly' ? 'weekly' : 'daily', settings.get(), { force: true });
+    return sendJson(res, result.ok ? 200 : 400, result.ok ? result : { ...result, error: 'not sent: check that email alerts are on in Settings' });
   }
 
   // --- Security (read-only) ---

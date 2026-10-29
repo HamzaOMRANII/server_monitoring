@@ -37,7 +37,9 @@ export default function AppDetail({ name }) {
 
   const a = d.app;
   const pts = d.series.points;
-  const markers = d.restarts.map((r) => ({ ts: r.ts, label: `${r.count} restart(s) · ${fmtDateTime(r.ts)}` }));
+  const markers = d.restarts.map((r) => ({ ts: r.ts, label: `${r.kind === 'manual' ? 'manual restart' : r.kind === 'crash' ? `crash (exit ${r.code})` : `${r.count} restart(s)`} · ${fmtDateTime(r.ts)}` }));
+  const crashCount = d.restarts.filter((r) => r.kind !== 'manual').reduce((s, r) => s + r.count, 0);
+  const manualCount = d.restarts.filter((r) => r.kind === 'manual').length;
   const chartProps = { stepMs: d.series.stepMs, from: d.series.from, to: d.series.to, markers };
   const mbFmt = (v, axis) => (axis ? `${Math.round(v / 1048576)}` : fmtBytes(v));
   const rangeLabel = RANGES.find(([k]) => k === range)[1];
@@ -57,7 +59,7 @@ export default function AppDetail({ name }) {
           <StatTile label="CPU" value={a.cpu ?? '—'} unit={a.cpu != null ? '%' : ''} sub="now" />
           <StatTile label="Memory" value={fmtBytes(a.memoryBytes)} sub={a.processes ? `now · ${a.processes} process${a.processes > 1 ? 'es' : ''}` : 'now'} />
           <StatTile label="Uptime" value={fmtUptime(a.uptimeMs ? a.uptimeMs / 1000 : null)} sub="since last start" />
-          <StatTile label="Restarts" value={a.restarts ?? '—'} sub={`${d.restarts.reduce((s, r) => s + r.count, 0)} in ${rangeLabel}`} />
+          <StatTile label="Restarts" value={a.restarts ?? '—'} sub={`in ${rangeLabel}: ${crashCount} crash · ${manualCount} manual`} />
         </section>
 
         <section className="panel">

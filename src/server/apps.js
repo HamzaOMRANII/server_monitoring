@@ -82,14 +82,48 @@ function sitesForPort(port) {
   })).flatMap((s) => s.serverNames);
 }
 
-// Restarts per minute from the stored counter (pm2's restart_time only goes up,
-// except after `pm2 reset` / a pm2 daemon restart, which we ignore).
+// Restarts with their cause, from pm2's own log: a manual restart/reload writes
+// "Stopping app:NAME" just before the exit, a crash does not. Cached for 30 s.
+const PM2_LOG = require('node:path').join(process.env.PM2_HOME || require('node:path').join(require('node:os').homedir(), '.pm2'), 'pm2.log');
+let pm2LogCache = { at: 0, events: null };
+function pm2LogEvents() {
+  if (pm2LogCache.events && Date.now() - pm2LogCache.at < 30e3) return pm2LogCache.events;
+  let text = '';
+  try {
+    const st = fs.statSync(PM2_LOG);
+    const start = Math.max(0, st.size - 2 * 1024 * 1024);
+    const fd = fs.openSync(PM2_LOG, 'r');
+    try { const buf = Buffer.alloc(st.size - start); fs.readSync(fd, buf, 0, buf.length, start); text = buf.toString('utf8'); } finally { fs.closeSync(fd); }
+  } catch { pm2LogCache = { at: Date.now(), events: null }; return null; }
+  const events = new Map(); // name -> [{ ts, kind, code, signal }]
+  const stopping = new Map(); // name -> ts
+  for (const line of text.split('\n')) {
+    const ts = Date.parse(line.slice(0, 19)); // "2026-10-29T05:16:14" = server local time
+    if (Number.isNaN(ts)) continue;
+    let m = line.match(/Stopping app:(\S+) id:/);
+    if (m) { stopping.set(m[1], ts); continue; }
+    m = line.match(/App \[(.+):\d+\] exited with code \[(-?\d+)\] via signal \[(\w+)\]/);
+    if (m) {
+      const manual = stopping.has(m[1]) && ts - stopping.get(m[1]) <= 15e3;
+      stopping.delete(m[1]);
+      if (!events.has(m[1])) events.set(m[1], []);
+      events.get(m[1]).push({ ts, count: 1, kind: manual ? 'manual' : 'crash', code: Number(m[2]), signal: m[3] });
+    }
+  }
+  pm2LogCache = { at: Date.now(), events };
+  return events;
+}
+
+// Restarts since `sinceMs` ago: from pm2.log when readable (with manual/crash),
+// else from the stored counter (pm2's restart_time, cause unknown).
 function restartEvents(name, sinceMs) {
+  const fromLog = pm2LogEvents();
+  if (fromLog) return (fromLog.get(name) || []).filter((e) => e.ts >= Date.now() - sinceMs);
   const rows = db.all('SELECT minute, restarts FROM pm2_minutes WHERE name = ? AND minute >= ? ORDER BY minute', name, Date.now() - sinceMs);
   const events = [];
   for (let i = 1; i < rows.length; i++) {
     const d = (rows[i].restarts ?? 0) - (rows[i - 1].restarts ?? 0);
-    if (d > 0) events.push({ ts: rows[i].minute, count: d });
+    if (d > 0) events.push({ ts: rows[i].minute, count: d, kind: 'unknown' });
   }
   return events;
 }
@@ -185,13 +219,18 @@ function advise(p, ctx) {
       [`pm2 logs ${p.name} --lines 50`, `ss -ltnp | grep :${p.port}`]);
   }
 
-  const lastHour = ctx.restarts.filter((r) => r.ts >= Date.now() - HOUR).reduce((s, r) => s + r.count, 0);
+  // manual restarts (deploys) are not crashes
+  const crashes = ctx.restarts.filter((r) => r.kind !== 'manual' && r.ts >= Date.now() - HOUR);
+  const lastHour = crashes.reduce((s, r) => s + r.count, 0);
+  const codes = [...new Set(crashes.filter((r) => r.code != null).map((r) => r.code))];
   if (lastHour >= 3 || (lastHour > 0 && (p.unstableRestarts || 0) > 0)) {
-    add('crit', `Crash loop: ${lastHour} restart(s) in the last hour`,
+    add('crit', `Crash loop: ${lastHour} crash(es) in the last hour${codes.length ? ` (exit code ${codes.join(', ')})` : ''}`,
       `${ctx.err && lastError(ctx.err.lines) ? `Last error line: ${lastError(ctx.err.lines)}. ` : ''}The app starts and dies; restarting again will not fix it — the error above usually names the cause (missing env, port in use, failed dependency).`,
       [`pm2 logs ${p.name} --err --lines 100`, `pm2 describe ${p.name}`]);
   } else if (lastHour > 0) {
-    add('warn', `Restarted ${lastHour} time(s) in the last hour`, 'If nobody deployed or restarted it, it crashed: check the error log.', [`pm2 logs ${p.name} --err --lines 50`]);
+    add('warn', `Crashed ${lastHour} time(s) in the last hour${codes.length ? ` (exit code ${codes.join(', ')})` : ''}`, crashes[0].kind === 'unknown'
+      ? 'Restarted without a known cause: if nobody deployed or restarted it, it crashed. Check the error log.'
+      : 'pm2 restarted it after it exited on its own. Check the error log.', [`pm2 logs ${p.name} --err --lines 50`]);
   }
 
   const t = ctx.trend;
@@ -213,7 +252,7 @@ function advise(p, ctx) {
   if (ctx.err && ctx.err.mtime && ctx.err.lines.length && !/^──── live log/.test(ctx.err.lines[ctx.err.lines.length - 1]) && Date.now() - ctx.err.mtime < HOUR && status === 'online' && !out.some((o) => o.level === 'crit')) {
     add('info', `Error log written ${Math.max(1, Math.round((Date.now() - ctx.err.mtime) / 60000))} min ago`, `Last line: ${ctx.err.lines[ctx.err.lines.length - 1].slice(0, 300)}`, [`pm2 logs ${p.name} --err --lines 50`]);
   }
-  if ((p.restarts || 0) >= 20 && !ctx.restarts.some((r) => r.ts >= Date.now() - 24 * HOUR)) {
+  if ((p.restarts || 0) >= 20 && !ctx.restarts.some((r) => r.kind !== 'manual' && r.ts >= Date.now() - 24 * HOUR)) {
     add('info', `${p.restarts} restarts in total, none in the last 24 h`, 'It is stable now; the counter just remembers older crashes or deploys.', [`pm2 reset ${p.name}   # sets the counter back to 0`]);
   }
   if (!out.length) add('ok', 'No issues found', 'Running, listening where expected, no recent restarts, memory and CPU look normal.', []);
@@ -289,4 +328,14 @@ async function detail(name, range) {
   };
 }
 
-module.exports = { overview, detail, advise };
+// Restarts per app over a period, split by cause (for the digest).
+function restartSummary(sinceMs) {
+  const out = {};
+  for (const p of store.current()?.pm2 || []) {
+    const ev = restartEvents(p.name, sinceMs);
+    out[p.name] = { manual: ev.filter((e) => e.kind === 'manual').length, crash: ev.filter((e) => e.kind !== 'manual').reduce((s, e) => s + e.count, 0) };
+  }
+  return out;
+}
+
+module.exports = { overview, detail, advise, restartSummary };

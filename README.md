@@ -58,6 +58,13 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
   Alerts: new port open to the internet (first run = known baseline; "mark as
   known" on the page), SSH brute force (failed logins/hour), optional email on
   every successful SSH login.
+- **Email digest** — daily (last 24 h) and/or weekly (last 7 days) HTML +
+  text email at a set hour and time zone (default 08:00 Asia/Ho_Chi_Minh,
+  weekly on Monday replacing that day's daily): what needs attention, CPU/RAM
+  averages and peaks, disk change and days-to-full, uptime per site, alerts,
+  certificates, apps (crashes vs manual restarts, advice), security summary.
+  Preview and "Send daily now" in Settings; sent periods are remembered, so a
+  restart never sends twice.
 - **Specs** — hostname, platform, CPU, memory, IPs, load average.
 
 ## How it works

@@ -9,7 +9,7 @@
 
 const nodemailer = require('nodemailer');
 
-async function sendEmail(email, subject, text) {
+async function sendEmail(email, subject, text, html) {
   try {
     const transport = nodemailer.createTransport({
       host: email.smtp.host,
@@ -22,6 +22,7 @@ async function sendEmail(email, subject, text) {
       to: (email.to || []).join(', '),
       subject,
       text,
+      ...(html ? { html } : {}),
     });
     return true;
   } catch (err) {
@@ -31,10 +32,11 @@ async function sendEmail(email, subject, text) {
 }
 
 // `receivers` is the live receivers object from settings.
-async function notify(receivers, { subject, text }) {
+// `html` is optional (the digest sends both; alerts are plain text).
+async function notify(receivers, { subject, text, html }) {
   const email = receivers && receivers.email;
   if (email && email.enabled && (email.to || []).length) {
-    return [['email', await sendEmail(email, subject, text)]];
+    return [['email', await sendEmail(email, subject, text, html)]];
   }
   console.log('[notifier] no email receiver enabled — would have sent:', subject);
   return [];

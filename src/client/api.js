@@ -29,6 +29,8 @@ export const api = {
 
   alertHistory: (days, rule, q) =>
     req('GET', `/api/alerts/history?days=${days}&rule=${encodeURIComponent(rule || '')}&q=${encodeURIComponent(q || '')}`),
+  digest: () => req('GET', '/api/digest'),
+  digestSend: (period) => req('POST', '/api/digest/send', { period }),
   security: (refresh) => req('GET', `/api/security${refresh ? '?refresh=1' : ''}`),
   securityKnownPort: (port) => req('POST', '/api/security/known-port', { port }),
   apps: () => req('GET', '/api/apps'),

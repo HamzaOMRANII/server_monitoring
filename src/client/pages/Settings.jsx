@@ -16,8 +16,11 @@ export default function Settings() {
   const [saved, setSaved] = useState('');
   const [testMsg, setTestMsg] = useState('');
   const [uptime, setUptime] = useState(null);
+  const [digest, setDigest] = useState(null);
+  const [digestMsg, setDigestMsg] = useState('');
 
   useEffect(() => {
+    api.digest().then((d) => setDigest({ daily: d.daily, weekly: d.weekly, hour: d.hour, weekday: d.weekday, timeZone: d.timeZone, lastDaily: d.lastDaily, lastWeekly: d.lastWeekly })).catch(() => {});
     api.getSettings().then((s) => {
       setRules({ siteDown: { enabled: true, failures: 2, remindMinutes: 30 }, sslExpiry: { enabled: true, days: 14, remindMinutes: 1440 }, newPublicPort: { enabled: true }, sshBruteForce: { enabled: true, perHour: 1000, remindMinutes: 360 }, sshLogin: { enabled: false }, ...(s.alertRules || {}) });
       const u = s.uptime || {};
@@ -35,7 +38,7 @@ export default function Settings() {
     }).catch(() => {});
   }, []);
 
-  if (!rules || !email || !uptime) return (<><Header active="/settings" sub="settings" /><main className="wrap"><div className="panel">Loading…</div></main></>);
+  if (!rules || !email || !uptime || !digest) return (<><Header active="/settings" sub="settings" /><main className="wrap"><div className="panel">Loading…</div></main></>);
 
   function setRule(key, field, value) {
     setRules((r) => ({ ...r, [key]: { ...r[key], [field]: value } }));
@@ -52,6 +55,7 @@ export default function Settings() {
         intervalSeconds: Number(uptime.intervalSeconds), timeoutSeconds: Number(uptime.timeoutSeconds),
         extraUrls: uptime.extraUrls, tlsEndpoints: uptime.tlsEndpoints, ignore: uptime.ignore,
       },
+      digest: { daily: digest.daily, weekly: digest.weekly, hour: Number(digest.hour), weekday: Number(digest.weekday), timeZone: digest.timeZone },
       receivers: {
         email: {
           enabled: email.enabled,
@@ -147,6 +151,38 @@ export default function Settings() {
               <textarea rows={2} value={uptime.tlsEndpoints} placeholder="turn.example.com:5349" onChange={(e) => setUptime({ ...uptime, tlsEndpoints: e.target.value })} /></label>
             <label className="field"><span>Ignored (one per line; also toggled from the Uptime page)</span>
               <textarea rows={2} value={uptime.ignore} onChange={(e) => setUptime({ ...uptime, ignore: e.target.value })} /></label>
+          </section>
+
+          <section className="panel form-card">
+            <h2>Email digest</h2>
+            <p className="muted">A summary email: server, sites, alerts, apps and security. On the weekly day only the weekly one is sent.</p>
+            <label className="toggle">
+              <input type="checkbox" checked={digest.daily} onChange={(e) => setDigest({ ...digest, daily: e.target.checked })} />
+              <span>Daily report (last 24 h)</span>
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={digest.weekly} onChange={(e) => setDigest({ ...digest, weekly: e.target.checked })} />
+              <span>Weekly report (last 7 days)</span>
+            </label>
+            <div className="row">
+              <label className="field"><span>Send at (hour, 0–23)</span>
+                <input type="number" min="0" max="23" value={digest.hour} onChange={(e) => setDigest({ ...digest, hour: e.target.value })} /></label>
+              <label className="field"><span>Weekly on</span>
+                <select value={digest.weekday} onChange={(e) => setDigest({ ...digest, weekday: Number(e.target.value) })}>
+                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => <option key={d} value={i}>{d}</option>)}
+                </select></label>
+              <label className="field"><span>Time zone</span>
+                <input type="text" value={digest.timeZone} placeholder="Asia/Ho_Chi_Minh" onChange={(e) => setDigest({ ...digest, timeZone: e.target.value })} /></label>
+            </div>
+            <div className="test-row">
+              <a className="button-link secondary" href="/api/digest/preview?period=daily" target="_blank" rel="noreferrer">Preview daily</a>
+              <a className="button-link secondary" href="/api/digest/preview?period=weekly" target="_blank" rel="noreferrer">Preview weekly</a>
+              <button type="button" className="secondary" onClick={async () => {
+                setDigestMsg('Sending…');
+                try { const r = await api.digestSend('daily'); setDigestMsg(`Sent ✓ "${r.subject}"`); } catch (e) { setDigestMsg(`Failed: ${e.message}`); }
+              }}>Send daily now</button>
+              <span className="muted">{digestMsg || `Last sent: daily ${digest.lastDaily || '—'}, weekly ${digest.lastWeekly || '—'}`}</span>
+            </div>
           </section>
 
           <section className="panel form-card">

@@ -374,3 +374,11 @@ tr.clickable:hover td{ background:rgba(139,168,196,0.05); }
 details.updates{ margin-top:12px; }
 details.updates summary{ cursor:pointer; color:var(--ink-muted); font-size:13px; }
 .update-list{ margin-top:8px; font-size:12px; line-height:1.7; }
+
+/* ---- digest (M6) ---- */
+.button-link{ display:inline-flex; align-items:center; padding:11px 18px; border-radius:10px; font-size:14px; text-decoration:none; }
+.button-link.secondary{ border:1px solid var(--navy-line); color:var(--ink); }
+.button-link.secondary:hover{ border-color:var(--petrol-bright); }
+.test-row{ flex-wrap:wrap; }
+.row{ flex-wrap:wrap; }
+.row > .field{ flex:1 1 160px; }

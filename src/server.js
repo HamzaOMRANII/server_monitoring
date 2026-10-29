@@ -37,6 +37,7 @@ require('./server/alerts').resume(); // firing alerts survive a restart (alert h
 const serverName = sampler.start(cfg); // begin sampling this box immediately
 uptime.start(settings.get); // site uptime + certificate checks
 require('./server/security').start(settings.get); // SSH, ports, updates (read-only)
+require('./server/digest').start(settings.get); // daily / weekly email report
 
 const PORT = cfg.central.port || 16000;
 const HOST = cfg.central.host || '127.0.0.1';
