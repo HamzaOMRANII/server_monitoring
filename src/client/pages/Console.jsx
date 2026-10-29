@@ -37,6 +37,8 @@ const CONFIRM = {
   'pm2.start': null,
   'pm2.flush': (n) => `Empty the log files of "${n}"? The current log lines are deleted.`,
   'nginx.test': null,
+  'fail2ban.status': null,
+  'fail2ban.unban': (ip) => `Unban ${ip} so it can try SSH logins again?`,
   'nginx.reload': () => 'Reload nginx? The config is tested first; nothing happens if the test fails.',
 };
 
@@ -59,9 +61,11 @@ function ActionsPanel({ password, onLock }) {
   const [out, setOut] = useState(null);
   const [running, setRunning] = useState('');
   const [runs, setRuns] = useState(0);
+  const [ip, setIp] = useState('');
 
   useEffect(() => {
     api.actions().then((d) => setList(d.actions || [])).catch(() => {});
+    api.whoami().then((w) => setIp(w.ip || '')).catch(() => {});
     api.metrics().then((m) => {
       const names = ((m.server && m.server.pm2) || []).map((p) => ({ name: p.name, status: p.status }));
       setProcs(names);
@@ -71,7 +75,8 @@ function ActionsPanel({ password, onLock }) {
   }, []);
 
   async function run(a) {
-    const arg = a.needs === 'process' ? proc : undefined;
+    const arg = a.needs === 'process' ? proc : a.needs === 'ip' ? ip.trim() : undefined;
+    if (a.needs === 'ip' && !arg) { setOut({ ok: false, output: 'Enter an address first.' }); return; }
     if (a.needs === 'process' && !arg) { setOut({ ok: false, output: 'Pick an app first.' }); return; }
     const ask = CONFIRM[a.id];
     if (ask && !window.confirm(ask(arg))) return;
@@ -86,7 +91,8 @@ function ActionsPanel({ password, onLock }) {
   }
 
   const procActions = list.filter((a) => a.needs === 'process');
-  const plainActions = list.filter((a) => a.needs !== 'process');
+  const nginxActions = list.filter((a) => a.id.startsWith('nginx.'));
+  const f2bActions = list.filter((a) => a.id.startsWith('fail2ban.'));
   const current = procs.find((p) => p.name === proc);
 
   return (
@@ -115,13 +121,30 @@ function ActionsPanel({ password, onLock }) {
         <div className="panel">
           <h2>nginx</h2>
           <div className="action-btns">
-            {plainActions.map((a) => (
+            {nginxActions.map((a) => (
               <button key={a.id} type="button" className="secondary" disabled={!!running} onClick={() => run(a)}>
                 {running === a.id ? '…' : a.label}
               </button>
             ))}
           </div>
         </div>
+
+        {f2bActions.length > 0 && (
+          <div className="panel">
+            <h2>fail2ban <span className="muted h2-sub">SSH ban list</span></h2>
+            <div className="action-row">
+              <input type="text" className="ip-input mono" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="IP address" aria-label="IP address" />
+              <div className="action-btns">
+                {f2bActions.map((a) => (
+                  <button key={a.id} type="button" className="secondary" disabled={!!running} onClick={() => run(a)}>
+                    {running === a.id ? '…' : a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="muted note">Pre-filled with your current address. 5 wrong SSH passwords in 10 min bans an address for 1 h (longer if it keeps happening); the web dashboard is never blocked.</p>
+          </div>
+        )}
 
         {out && (
           <div className={`panel out ${out.ok ? '' : 'out-err'}`}>

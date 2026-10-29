@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { ROOT } = require('./config');
+const net = require('node:net');
 
 const LOG = path.join(ROOT, 'data', 'actions.log');
 
@@ -49,6 +50,16 @@ const ACTIONS = {
     label: 'Flush a pm2 app log',
     needs: 'process',
     build: (name) => ['pm2', ['flush', name]],
+  },
+  'fail2ban.status': {
+    label: 'Show banned addresses',
+    needs: 'none',
+    build: () => ['fail2ban-client', ['status', 'sshd']],
+  },
+  'fail2ban.unban': {
+    label: 'Unban an address',
+    needs: 'ip',
+    build: (ip) => ['fail2ban-client', ['set', 'sshd', 'unbanip', ip]],
   },
   'nginx.test': {
     label: 'Test nginx config',
@@ -103,6 +114,12 @@ async function execute(id, arg, { ip = '?' } = {}) {
       return { ok: true, code: 0, output: `Restarting "${SELF}" (this dashboard) in 1 s — the page reconnects by itself.` };
     }
   }
+
+  if (action.needs === 'ip' && !(typeof arg === 'string' && net.isIP(arg.trim()))) {
+    audit(`DENY ${id} arg=${JSON.stringify(arg)} (not an IP address) ${who}`);
+    return { ok: false, error: 'not a valid IPv4/IPv6 address' };
+  }
+  if (action.needs === 'ip') arg = arg.trim();
 
   const [cmd, args] = action.build(arg);
   audit(`RUN  ${id} ${args.join(' ')} ${who}`);

@@ -43,6 +43,7 @@ export const api = {
   consoleUnlock: (password) => req('POST', '/api/console/unlock', { password }),
   actions: () => req('GET', '/api/actions'),
   actionsLog: () => req('GET', '/api/actions/log'),
+  whoami: () => req('GET', '/api/whoami'),
   runAction: (id, arg, password) => req('POST', '/api/actions/run', { id, arg, password }),
 
   logSources: () => req('GET', '/api/logs/sources'),

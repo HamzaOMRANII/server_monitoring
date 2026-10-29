@@ -225,6 +225,8 @@ async function slowChecks(force = false) {
       sshdJail: !!st,
       banned: st ? Number((st.match(/Currently banned:\s+(\d+)/) || [])[1] || 0) : 0,
       totalBanned: st ? Number((st.match(/Total banned:\s+(\d+)/) || [])[1] || 0) : 0,
+      totalFailed: st ? Number((st.match(/Total failed:\s+(\d+)/) || [])[1] || 0) : 0,
+      source: st ? ((st.match(/(?:Journal matches|File list):\s+(.+)/) || [])[1] || '').trim() : '',
     };
   }
   let reboot = null;
@@ -263,6 +265,10 @@ function findings(ctx) {
       ['apt install -y fail2ban && systemctl enable --now fail2ban', 'fail2ban-client status sshd']);
   } else if (fail2ban.installed && !fail2ban.sshdJail) {
     add('warn', 'fail2ban is installed but has no sshd jail', 'It is not protecting SSH.', ['fail2ban-client status']);
+  } else if (fail2ban.installed && fail2ban.totalFailed === 0 && ssh.failsLastHour > 20) {
+    add('warn', 'fail2ban runs but sees no failed SSH logins',
+      `auth.log shows ${ssh.failsLastHour} failures in about an hour, but fail2ban has counted none: it is probably reading the wrong log (${fail2ban.source || 'unknown source'}). On Ubuntu 24.04 the service is ssh.service, not sshd.service.`,
+      ['fail2ban-client status sshd', 'systemctl list-units | grep ssh', "printf '[sshd]\\njournalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd\\n' > /etc/fail2ban/jail.d/ssh-unit.local && systemctl restart fail2ban"]);
   }
   const open = ports.filter((p) => p.exposure.level === 'internet');
   const byPort = (n) => open.filter((p) => p.port === n);
@@ -315,7 +321,8 @@ async function snapshot() {
   // auth.log; addresses from the initial 7-day backfill are the known baseline.
   const historyStart = kvGet('historyStart', now);
   const firstRunAt = kvGet('firstRunAt', historyStart + 7 * DAY);
-  const isNew = (ip) => firstSeen.get(ip) >= Math.max(now - 7 * DAY, firstRunAt);
+  const own = new Set(((store.current()?.specs?.ips) || []).map((x) => x.ip));
+  const isNew = (ip) => !own.has(ip) && !isLoopback(ip) && firstSeen.get(ip) >= Math.max(now - 7 * DAY, firstRunAt);
   const newLoginIps = [...new Set(logins.filter((l) => isNew(l.ip)).map((l) => l.ip))];
 
   const portKey = (p) => `${p.proto}/${p.port}`;

@@ -190,6 +190,9 @@ async function handle(req, res, pathname, ctx) {
     const result = await actions.execute(body.id, body.arg, { ip: clientIp(req) });
     return sendJson(res, result.ok ? 200 : 400, result);
   }
+  if (pathname === '/api/whoami' && method === 'GET') {
+    return sendJson(res, 200, { ip: clientIp(req) });
+  }
   if (pathname === '/api/actions/log' && method === 'GET') {
     return sendJson(res, 200, { lines: actions.recent(60) });
   }
