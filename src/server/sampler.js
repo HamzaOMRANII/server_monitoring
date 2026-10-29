@@ -8,6 +8,7 @@
 const os = require('node:os');
 const collectors = require('./collectors');
 const store = require('./store');
+const metrics = require('./metrics');
 const alerts = require('./alerts');
 const settings = require('./settings');
 
@@ -23,6 +24,7 @@ async function sampleOnce(opts) {
     const snapshot = await collectors.collect(opts);
     snapshot.ts = Date.now();
     store.record(snapshot);
+    metrics.add(snapshot);
     await alerts.process(snapshot, settings.get());
     return snapshot;
   } catch (err) {

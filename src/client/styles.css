@@ -328,3 +328,16 @@ select{ padding:10px 12px; background:var(--tile); color:var(--ink); border:1px 
   .topbar nav a{ margin-left:0; }
   .tl-tick:nth-child(2), .tl-tick:nth-child(4), .tl-tick:nth-child(5){ display:none; }
 }
+
+/* ---- metrics history (M3) ---- */
+.charts{ grid-template-columns:repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.chart-controls{ margin-bottom:-4px; }
+.chart-controls .seg button{ padding:7px 12px; }
+.live-toggle{ display:inline-flex; align-items:center; gap:8px; }
+.live-toggle:not(.is-live){ border-color:var(--gold); color:var(--gold); }
+.chart-key{ display:inline-flex; align-items:center; gap:5px; font:11px var(--font-mono); color:var(--ink-dim); margin-left:auto; margin-right:12px; }
+.chart-key i{ display:inline-block; width:14px; }
+.chart-key .k-avg{ height:2px; }
+.chart-key .k-peak{ height:0; border-top:1px dashed; margin-left:6px; }
+.chart-xaxis{ display:flex; justify-content:space-between; padding-left:30px; font:10px var(--font-mono); color:var(--ink-dim); margin-top:2px; }
+.uptime-pct{ display:block; font-size:11px; color:var(--ink-dim); }

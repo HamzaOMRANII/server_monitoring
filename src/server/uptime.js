@@ -23,6 +23,7 @@ const https = require('node:https');
 const tls = require('node:tls');
 const alerts = require('./alerts');
 const store = require('./store');
+const metrics = require('./metrics');
 
 const DEFAULTS = {
   uptime: { intervalSeconds: 60, timeoutSeconds: 10, ignore: [], extraUrls: [], tlsEndpoints: [] },
@@ -181,6 +182,7 @@ async function runOnce(settings) {
     for (const [id, old] of results) {
       if (ids.has(id)) continue;
       results.delete(id); // target removed: drop its open alerts silently
+      if (!old.kind) continue; // history reloaded at start-up for a target that no longer exists
       alerts.clear('siteDown', label(old));
       alerts.clear('sslExpiry', label(old));
     }
@@ -195,7 +197,9 @@ async function runOnce(settings) {
       }
       const r = await checkTarget(t, cfg);
       const up = r.public.up && (!r.app || r.app.up);
-      const history = [...prev.history, { ts: Date.now(), up, ms: r.public.ms ?? null }].slice(-HISTORY_MAX);
+      const check = { ts: Date.now(), up, ms: r.public.ms ?? null };
+      metrics.recordCheck(t.id, check.ts, check.up, check.ms);
+      const history = [...prev.history, check].slice(-HISTORY_MAX);
       const failures = up ? 0 : prev.failures + 1;
       const row = { ...t, ...r, up, failures, history, checkedAt: Date.now() };
       results.set(t.id, row);
@@ -249,11 +253,15 @@ function uptimePercent(history, sinceMs) {
 // What the UI gets: latest result per target + 24 h uptime + the last 60 checks.
 function view(settings) {
   const cfg = config(settings);
-  const rows = [...results.values()].map((r) => ({
+  const week = metrics.uptimePercents(7 * DAY);
+  const month = metrics.uptimePercents(30 * DAY);
+  const rows = [...results.values()].filter((r) => r.kind).map((r) => ({
     id: r.id, kind: r.kind, host: r.host, port: r.port || null, url: r.url, upstream: r.upstream, ignored: !!r.ignored,
     name: label(r), up: r.ignored ? null : r.up ?? null, failures: r.failures || 0, checkedAt: r.checkedAt || null,
     public: r.public || null, app: r.app || null, certs: r.certs || [],
     uptime24h: uptimePercent(r.history || [], DAY),
+    uptime7d: week[r.id] ?? null,
+    uptime30d: month[r.id] ?? null,
     recent: (r.history || []).slice(-60),
   }));
   rows.sort((a, b) => (a.ignored - b.ignored) || ((a.up === false ? 0 : 1) - (b.up === false ? 0 : 1)) || a.name.localeCompare(b.name));
@@ -269,7 +277,17 @@ function summary(settings) {
   return { total: active.length, up: active.filter((t) => t.up).length, down: active.filter((t) => !t.up).map((t) => t.name), soonestCert: soonest };
 }
 
+// After a restart: refill the in-memory 24 h history from SQLite.
+function reload() {
+  for (const c of metrics.recentChecks(DAY)) {
+    const r = results.get(c.target) || { id: c.target, history: [], failures: 0, restored: true };
+    r.history.push({ ts: c.ts, up: !!c.up, ms: c.ms });
+    results.set(c.target, r);
+  }
+}
+
 function start(getSettings) {
+  reload();
   const tick = async () => {
     try { await runOnce(getSettings()); } catch (err) { console.error('[uptime] run failed:', err.message); }
     const every = Math.max(30, Number(config(getSettings()).uptime.intervalSeconds) || 60) * 1000;

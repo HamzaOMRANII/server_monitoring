@@ -112,7 +112,7 @@ export default function Uptime() {
           <div className="table-scroll">
             <table className="t">
               <thead>
-                <tr><th>Site</th><th>Status</th><th>Public</th><th>App</th><th className="num">ms</th><th className="num">24 h</th><th>Last 60 checks</th><th>Certificates</th><th /></tr>
+                <tr><th>Site</th><th>Status</th><th>Public</th><th>App</th><th className="num">ms</th><th className="num">24 h</th><th className="num">7 d</th><th className="num">30 d</th><th>Last 60 checks</th><th>Certificates</th><th /></tr>
               </thead>
               <tbody>
                 {data.targets.length ? data.targets.map((t) => (
@@ -123,11 +123,13 @@ export default function Uptime() {
                     <td title={t.app?.upstream || ''}><Check c={t.app} empty={t.kind === 'site' ? 'no upstream' : '—'} /></td>
                     <td className="num">{t.public?.ms ?? '—'}</td>
                     <td className="num">{t.uptime24h != null ? `${t.uptime24h}%` : '—'}</td>
+                    <td className="num">{t.uptime7d != null ? `${t.uptime7d}%` : '—'}</td>
+                    <td className="num">{t.uptime30d != null ? `${t.uptime30d}%` : '—'}</td>
                     <td><Strip recent={t.recent} /></td>
                     <td><Certs certs={t.certs} warnDays={data.sslDays} /></td>
                     <td className="num"><button type="button" className="link-btn" onClick={() => toggle(t)} disabled={busy}>{t.ignored ? 'Watch' : 'Ignore'}</button></td>
                   </tr>
-                )) : <tr><td colSpan={9} className="muted">No sites yet: waiting for the first nginx scan.</td></tr>}
+                )) : <tr><td colSpan={11} className="muted">No sites yet: waiting for the first nginx scan.</td></tr>}
               </tbody>
             </table>
           </div>

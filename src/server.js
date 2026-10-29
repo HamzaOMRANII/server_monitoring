@@ -25,12 +25,14 @@ const authFactory = require('./server/auth');
 const settings = require('./server/settings');
 const sampler = require('./server/sampler');
 const uptime = require('./server/uptime');
+const metrics = require('./server/metrics');
 const api = require('./server/api');
 const { sendText } = require('./server/http-util');
 
 const cfg = load();
 settings.seedFrom(cfg);
 const auth = authFactory.create(cfg);
+metrics.start(); // metrics history in SQLite
 require('./server/alerts').resume(); // firing alerts survive a restart (alert history)
 const serverName = sampler.start(cfg); // begin sampling this box immediately
 uptime.start(settings.get); // site uptime + certificate checks
@@ -133,6 +135,7 @@ server.listen(PORT, HOST, () => {
 });
 
 function shutdown() {
+  metrics.flush(); // write the partial minute: a restart loses at most a few seconds
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 5000).unref();
 }

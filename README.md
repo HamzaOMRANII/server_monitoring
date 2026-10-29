@@ -14,8 +14,10 @@ The reference deployment is **monitoring.omranisystems.com** (port 16000).
 
 - **Stat tiles** — CPU, memory, main-disk usage, uptime, pm2 apps online,
   nginx sites.
-- **History charts** — CPU and memory over the last hour (inline-SVG area
-  charts with a hover crosshair + tooltip).
+- **History charts** — CPU, memory and main disk for the last hour (10 s
+  samples, memory) or 6 h / 24 h / 7 d / 30 d (minute rows in SQLite, ~300
+  points, dashed line = peak), with a Live/Paused switch. Hover crosshair +
+  tooltip. Kept 90 days; pm2 per-app minutes and uptime checks 30 days.
 - **Storage** — a ring gauge for the main mount plus a used/total bar per
   mount, coloured by usage level.
 - **Apps (pm2)** — status, CPU, memory, uptime, restarts per process.

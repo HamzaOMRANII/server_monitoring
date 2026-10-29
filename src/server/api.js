@@ -13,6 +13,7 @@ const actions = require('./actions');
 const logs = require('./logs');
 const uptime = require('./uptime');
 const history = require('./history');
+const metrics = require('./metrics');
 const { sendJson, readJsonBody } = require('./http-util');
 
 async function handle(req, res, pathname, ctx) {
@@ -38,18 +39,20 @@ async function handle(req, res, pathname, ctx) {
     return sendJson(res, 200, { server: store.current(), alerts: alerts.activeAlerts() });
   }
 
-  // Time series for the charts. ?minutes=60 -> downsampled cpu/mem/disk points.
+  // Time series for the charts. ?range=1h (10 s samples from memory) or
+  // 6h / 24h / 7d / 30d / 90d (minute rows from SQLite, ~300 buckets with peaks).
   if (pathname === '/api/history' && method === 'GET') {
     const url = new URL(req.url, 'http://localhost');
-    const minutes = Math.min(Number(url.searchParams.get('minutes')) || 60, 240);
-    const rows = store.since(minutes * 60 * 1000);
-    const series = rows.map((s) => ({
-      ts: s.ts,
-      cpu: round(s.cpuPercent),
-      mem: round(s.memPercent),
-      disk: round(mainDiskPercent(s)),
-    }));
-    return sendJson(res, 200, series);
+    const range = url.searchParams.get('range') || '1h';
+    if (range !== '1h') {
+      if (!metrics.RANGES[range]) return sendJson(res, 400, { error: 'unknown range' });
+      return sendJson(res, 200, metrics.series(range));
+    }
+    const rows = store.since(60 * 60 * 1000);
+    return sendJson(res, 200, {
+      range, from: Date.now() - 3600e3, to: Date.now(), stepMs: 10000,
+      points: rows.map((s) => ({ ts: s.ts, cpu: round(s.cpuPercent), mem: round(s.memPercent), disk: round(mainDiskPercent(s)), load1: s.specs?.loadavg?.[0] ?? null })),
+    });
   }
 
   // --- Alert history ---

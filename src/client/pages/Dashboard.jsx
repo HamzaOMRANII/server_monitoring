@@ -22,22 +22,32 @@ function mainDisk(server) {
   return d.reduce((a, b) => (b.totalBytes > a.totalBytes ? b : a), d[0]);
 }
 
+const RANGES = [['1h', 'last hour'], ['6h', '6 hours'], ['24h', '24 hours'], ['7d', '7 days'], ['30d', '30 days']];
+
 export default function Dashboard() {
   const [server, setServer] = useState(null);
   const [alerts, setAlerts] = useState([]);
-  const [hist, setHist] = useState([]);
+  const [hist, setHist] = useState(null);
+  const [range, setRange] = useState('1h');
+  const [live, setLive] = useState(true);
   const [up, setUp] = useState(null);
   const [error, setError] = useState('');
 
+  // Live: tiles every 5 s; the 1 h chart with them, longer ranges every minute.
+  // Paused: nothing refreshes, so a spike can be inspected without it scrolling away.
   useEffect(() => {
     let alive = true;
+    let ticks = 0;
     async function refresh() {
+      const withHist = ticks++ % (range === '1h' ? 1 : 12) === 0;
       try {
-        const [m, h, u] = await Promise.all([api.metrics(), api.history(60), api.uptimeSummary().catch(() => null)]);
+        const [m, h, u] = await Promise.all([
+          api.metrics(), withHist ? api.history(range) : null, api.uptimeSummary().catch(() => null),
+        ]);
         if (!alive) return;
         setServer(m.server);
         setAlerts(m.alerts || []);
-        setHist(h || []);
+        if (h) setHist(h);
         setUp(u);
         setError('');
       } catch (e) {
@@ -45,9 +55,10 @@ export default function Dashboard() {
       }
     }
     refresh();
+    if (!live) return () => { alive = false; };
     const id = setInterval(refresh, 5000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [range, live]);
 
   if (!server) {
     return (<><Header active="/" /><main className="wrap"><div className="panel">{error || 'Collecting first sample…'}</div></main></>);
@@ -58,8 +69,12 @@ export default function Dashboard() {
   const procs = server.pm2 || [];
   const online = procs.filter((p) => (p.status || '').toLowerCase() === 'online').length;
   const sites = (server.nginx && server.nginx.sites) || [];
-  const cpuSeries = hist.map((r) => ({ ts: r.ts, v: r.cpu }));
-  const memSeries = hist.map((r) => ({ ts: r.ts, v: r.mem }));
+  const points = hist?.points || [];
+  const cpuSeries = points.map((r) => ({ ts: r.ts, v: r.cpu, p: r.cpuMax }));
+  const memSeries = points.map((r) => ({ ts: r.ts, v: r.mem, p: r.memMax }));
+  const diskSeries = points.map((r) => ({ ts: r.ts, v: r.disk }));
+  const rangeLabel = RANGES.find(([k]) => k === range)[1];
+  const chartProps = { stepMs: hist?.stepMs, from: hist?.from, to: hist?.to };
 
   return (
     <>
@@ -87,9 +102,21 @@ export default function Dashboard() {
           </a>
         </section>
 
+        <div className="filters chart-controls">
+          <div className="seg" role="group" aria-label="Chart range">
+            {RANGES.map(([k, label]) => (
+              <button key={k} type="button" className={range === k ? 'on' : ''} onClick={() => { setHist(null); setRange(k); }}>{label}</button>
+            ))}
+          </div>
+          <button type="button" className={`secondary small live-toggle ${live ? 'is-live' : ''}`} onClick={() => setLive((v) => !v)} aria-pressed={!live}>
+            {live ? <><span className="live-dot" /> Live</> : '❚❚ Paused — resume'}
+          </button>
+          <span className="muted h2-sub">{range === '1h' ? '10 s samples' : `1 point = ${Math.round((hist?.stepMs || 60000) / 60000)} min · dashed = peak`}</span>
+        </div>
         <section className="charts">
-          <div className="panel chart-panel"><AreaChart data={cpuSeries} color="var(--petrol-bright)" title="CPU — last hour" /></div>
-          <div className="panel chart-panel"><AreaChart data={memSeries} color="var(--blue)" title="Memory — last hour" /></div>
+          <div className="panel chart-panel"><AreaChart data={cpuSeries} color="var(--petrol-bright)" title={`CPU — ${rangeLabel}`} now={server.cpuPercent} {...chartProps} /></div>
+          <div className="panel chart-panel"><AreaChart data={memSeries} color="var(--blue)" title={`Memory — ${rangeLabel}`} now={server.memPercent} {...chartProps} /></div>
+          <div className="panel chart-panel"><AreaChart data={diskSeries} color="var(--petrol-bright)" title={`Disk ${disk ? disk.mount : ''} — ${rangeLabel}`} now={disk?.usedPercent} {...chartProps} /></div>
         </section>
 
         <StoragePanel disks={server.disks} />

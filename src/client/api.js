@@ -22,7 +22,7 @@ export const api = {
   login: (password) => req('POST', '/api/login', { password }),
   logout: () => req('POST', '/api/logout'),
   metrics: () => req('GET', '/api/metrics'),
-  history: (minutes = 60) => req('GET', `/api/history?minutes=${minutes}`),
+  history: (range = '1h') => req('GET', `/api/history?range=${range}`),
   getSettings: () => req('GET', '/api/settings'),
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),

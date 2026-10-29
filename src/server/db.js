@@ -28,6 +28,33 @@ const MIGRATIONS = [
    );
    CREATE INDEX alert_events_started ON alert_events(started_at);
    CREATE INDEX alert_events_open ON alert_events(ended_at) WHERE ended_at IS NULL;`,
+
+  // 2 — metrics history (M3): one row per minute (averages + peaks of the 10 s
+  // samples), per pm2 app per minute, and every uptime check.
+  `CREATE TABLE metric_minutes (
+     minute   INTEGER PRIMARY KEY,                 -- ms since epoch, start of the minute
+     cpu_avg  REAL, cpu_max REAL,
+     mem_avg  REAL, mem_max REAL,
+     disk     REAL,                                -- main mount, % used
+     load1    REAL,
+     samples  INTEGER NOT NULL
+   ) WITHOUT ROWID;
+   CREATE TABLE pm2_minutes (
+     minute   INTEGER NOT NULL,
+     name     TEXT NOT NULL,
+     cpu_avg  REAL, mem_avg REAL,                  -- %, bytes
+     restarts INTEGER, online INTEGER NOT NULL,    -- online = 1 if online for the whole minute
+     PRIMARY KEY (name, minute)
+   ) WITHOUT ROWID;
+   CREATE INDEX pm2_minutes_minute ON pm2_minutes(minute);
+   CREATE TABLE uptime_checks (
+     target TEXT NOT NULL,
+     ts     INTEGER NOT NULL,
+     up     INTEGER NOT NULL,
+     ms     INTEGER,
+     PRIMARY KEY (target, ts)
+   ) WITHOUT ROWID;
+   CREATE INDEX uptime_checks_ts ON uptime_checks(ts);`,
 ];
 
 let db = null;
