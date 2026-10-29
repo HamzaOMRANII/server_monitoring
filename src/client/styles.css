@@ -388,3 +388,8 @@ button.danger-outline{ border-color:color-mix(in srgb, var(--crit) 55%, transpar
 .app-title .app-console{ margin-left:auto; }
 .action-row{ flex-wrap:wrap; }
 .ip-input{ max-width:260px; }
+.row-actions{ white-space:nowrap; }
+.row-actions .link-btn{ margin-left:4px; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--navy-line); border-radius:999px; font-size:12.5px; }
+.users-cell{ max-width:260px; overflow:hidden; text-overflow:ellipsis; }

@@ -46,6 +46,7 @@ export const api = {
   actions: () => req('GET', '/api/actions'),
   actionsLog: () => req('GET', '/api/actions/log'),
   whoami: () => req('GET', '/api/whoami'),
+  fail2ban: () => req('GET', '/api/fail2ban'),
   runAction: (id, arg, password) => req('POST', '/api/actions/run', { id, arg, password }),
 
   logSources: () => req('GET', '/api/logs/sources'),

@@ -4,6 +4,7 @@ import StatTile from '../components/StatTile.jsx';
 import AreaChart from '../components/AreaChart.jsx';
 import Advice from '../components/Advice.jsx';
 import { api } from '../api.js';
+import { go } from '../router.js';
 import { fmtDateTime } from '../format.js';
 
 const EXPOSURE_CLS = { internet: 'lv-crit', filtered: 'lv-info', local: 'lv-ok' };
@@ -148,7 +149,8 @@ export default function Security() {
             <div><span className="spec-k">Key login</span><span className="mono">{sshd.pubkeyauthentication || '—'}</span></div>
             <div><span className="spec-k">Tries per connection</span><span className="mono">{sshd.maxauthtries || '—'}</span></div>
             <div><span className="spec-k">fail2ban</span><span className={`mono ${d.fail2ban.installed ? '' : 'bad-text'}`}>
-              {d.fail2ban.installed ? (d.fail2ban.sshdJail ? `on · ${d.fail2ban.banned} banned now · ${d.fail2ban.totalBanned} total` : 'installed, no sshd jail') : 'not installed'}</span></div>
+              {d.fail2ban.installed ? (d.fail2ban.sshdJail ? `on · ${d.fail2ban.banned} banned now · ${d.fail2ban.totalBanned} total` : 'installed, no sshd jail') : 'not installed'}
+              {d.fail2ban.sshdJail && <> · <a href="/console" onClick={go('/console')}>manage bans →</a></>}</span></div>
             <div><span className="spec-k">Reboot</span><span className="mono">{d.reboot?.required ? 'required' : 'not needed'}</span></div>
             <div><span className="spec-k">Last backup</span><span className={`mono ${d.backup && d.backup.present && d.backup.ok ? '' : 'bad-text'}`}>
               {!d.backup || !d.backup.present ? 'never' : `${fmtDateTime(d.backup.finishedAt)} · ${(d.backup.sizeBytes / 1048576).toFixed(0)} MB${d.backup.ok ? '' : ' · FAILED'}`}</span></div>

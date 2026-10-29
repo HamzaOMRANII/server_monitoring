@@ -11,6 +11,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { ROOT } = require('./config');
 const net = require('node:net');
+const f2b = require('./fail2ban');
 
 const LOG = path.join(ROOT, 'data', 'actions.log');
 
@@ -57,9 +58,35 @@ const ACTIONS = {
     build: () => ['fail2ban-client', ['status', 'sshd']],
   },
   'fail2ban.unban': {
-    label: 'Unban an address',
+    label: 'Unban',
     needs: 'ip',
     build: (ip) => ['fail2ban-client', ['set', 'sshd', 'unbanip', ip]],
+  },
+  'fail2ban.ban': {
+    label: 'Ban',
+    needs: 'ip',
+    protectIp: true, // never the server, loopback or the caller
+    build: (ip) => ['fail2ban-client', ['set', 'sshd', 'banip', ip]],
+  },
+  'fail2ban.forget': {
+    label: 'Unban & forget',
+    needs: 'ip',
+    fn: (ip) => f2b.forget(ip),
+  },
+  'fail2ban.unbanall': {
+    label: 'Unban all',
+    needs: 'none',
+    build: () => ['fail2ban-client', ['unban', '--all']],
+  },
+  'fail2ban.allow': {
+    label: 'Allow (never ban)',
+    needs: 'ip',
+    fn: (ip) => f2b.setAllowed(ip, true),
+  },
+  'fail2ban.disallow': {
+    label: 'Remove from allow-list',
+    needs: 'ip',
+    fn: (ip) => f2b.setAllowed(ip, false),
   },
   'nginx.test': {
     label: 'Test nginx config',
@@ -120,6 +147,20 @@ async function execute(id, arg, { ip = '?' } = {}) {
     return { ok: false, error: 'not a valid IPv4/IPv6 address' };
   }
   if (action.needs === 'ip') arg = arg.trim();
+  if (action.protectIp) {
+    const why = f2b.protectedReason(arg, ip);
+    if (why) {
+      audit(`DENY ${id} ${arg} (${why}) ${who}`);
+      return { ok: false, error: `Refused: ${arg} is ${why}.` };
+    }
+  }
+
+  if (action.fn) {
+    audit(`RUN  ${id} ${arg ?? ''} ${who}`);
+    const res = await action.fn(arg).catch((err) => ({ ok: false, code: 1, output: err.message }));
+    audit(`DONE ${id} code=${res.code} ${who}`);
+    return { ok: res.ok, code: res.code, output: String(res.output || '').slice(0, 8000) };
+  }
 
   const [cmd, args] = action.build(arg);
   audit(`RUN  ${id} ${args.join(' ')} ${who}`);

@@ -17,6 +17,7 @@ const metrics = require('./metrics');
 const apps = require('./apps');
 const security = require('./security');
 const digest = require('./digest');
+const f2b = require('./fail2ban');
 const { sendJson, readJsonBody, clientIp, failLimiter } = require('./http-util');
 
 // One limiter for every password check (login, console unlock, console runs).
@@ -201,6 +202,10 @@ async function handle(req, res, pathname, ctx) {
     if (!checkPw(auth, req, res, body && body.password)) return;
     const result = await actions.execute(body.id, body.arg, { ip: clientIp(req) });
     return sendJson(res, result.ok ? 200 : 400, result);
+  }
+  // fail2ban ban list (read-only; the buttons go through /api/actions/run with the password)
+  if (pathname === '/api/fail2ban' && method === 'GET') {
+    return sendJson(res, 200, { ...(await f2b.view()), you: clientIp(req) });
   }
   if (pathname === '/api/whoami' && method === 'GET') {
     return sendJson(res, 200, { ip: clientIp(req) });

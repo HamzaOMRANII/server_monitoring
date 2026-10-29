@@ -39,6 +39,11 @@ const CONFIRM = {
   'nginx.test': null,
   'fail2ban.status': null,
   'fail2ban.unban': (ip) => `Unban ${ip} so it can try SSH logins again?`,
+  'fail2ban.ban': (ip) => `Ban ${ip} from SSH now (for the jail's ban time)?`,
+  'fail2ban.forget': (ip) => `Unban ${ip} and forget its past bans (its next ban starts at the base time again)?`,
+  'fail2ban.unbanall': () => 'Unban EVERY address now? Attackers will be able to retry until they are banned again.',
+  'fail2ban.allow': (ip) => `Never ban ${ip}? Only do this for your own fixed addresses.`,
+  'fail2ban.disallow': (ip) => `Remove ${ip} from the allow-list (it can be banned again)?`,
   'nginx.reload': () => 'Reload nginx? The config is tested first; nothing happens if the test fails.',
 };
 
@@ -51,6 +56,78 @@ function AuditLog({ refreshKey }) {
       {!lines ? <div className="muted">Loading…</div>
         : lines.length ? <pre className="logbox">{lines.join('\n')}</pre> : <div className="muted">No actions run yet.</div>}
     </section>
+  );
+}
+
+const fmtLeft = (sec) => (sec == null ? 'permanent' : sec >= 3600 ? `${Math.floor(sec / 3600)} h ${Math.round((sec % 3600) / 60)} min` : `${Math.max(1, Math.round(sec / 60))} min`);
+
+// fail2ban: every banned address with what it did, and the buttons to manage the list.
+function BanManager({ act, running, runs, ip, setIp }) {
+  const [d, setD] = useState(null);
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.fail2ban().then((x) => { if (alive) setD(x); }).catch(() => {});
+    load();
+    const id = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, [runs]);
+  if (!d) return <div className="panel"><h2>fail2ban</h2><div className="muted">Loading…</div></div>;
+  if (!d.available) return <div className="panel"><h2>fail2ban</h2><div className="bad-text">{d.reason}</div></div>;
+  const rows = d.banned.filter((b) => !q || b.ip.includes(q.trim()) || b.users.some((u) => u.includes(q.trim())));
+  const busy = !!running;
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>fail2ban <span className="muted h2-sub">SSH · {d.banned.length} banned now · {d.totalBanned} since start · rule: {d.rules.maxretry} fails in {Math.round(d.rules.findtimeSec / 60)} min → {Math.round(d.rules.bantimeSec / 60)} min, longer for repeat offenders</span></h2>
+        <div className="panel-actions">
+          <button type="button" className="secondary small danger-outline" disabled={busy || !d.banned.length} onClick={() => act('fail2ban.unbanall')}>Unban all</button>
+        </div>
+      </div>
+      <div className="action-row">
+        <input type="text" className="ip-input mono" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="IP address" aria-label="IP address" />
+        <div className="action-btns">
+          <button type="button" className="secondary" disabled={busy} onClick={() => act('fail2ban.ban', ip.trim())}>Ban</button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => act('fail2ban.unban', ip.trim())}>Unban</button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => act('fail2ban.allow', ip.trim())}>Allow (never ban)</button>
+        </div>
+        <span className="muted note">Your address now: <span className="mono">{d.you}</span></span>
+      </div>
+      <div className="filters" style={{ marginTop: 12 }}>
+        <input type="text" placeholder="Filter by address or user name…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="table-scroll">
+        <table className="t">
+          <thead><tr><th>Address</th><th>Banned</th><th>Ends in</th><th className="num">Times banned</th><th className="num">Tries 24 h</th><th>User names tried</th><th /></tr></thead>
+          <tbody>
+            {rows.length ? rows.map((b) => (
+              <tr key={b.ip}>
+                <td className="mono">{b.ip}</td>
+                <td className="mono">{new Date(b.since).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                <td className="mono">{fmtLeft(b.remainingSec)}</td>
+                <td className="num">{b.timesBanned}</td>
+                <td className="num">{b.attempts24h || '—'}</td>
+                <td className="mono muted users-cell" title={b.users.join(', ')}>{b.users.join(', ') || '—'}</td>
+                <td className="num row-actions">
+                  <button type="button" className="link-btn" disabled={busy} onClick={() => act('fail2ban.unban', b.ip)}>Unban</button>
+                  <button type="button" className="link-btn" disabled={busy} onClick={() => act('fail2ban.forget', b.ip)}>Unban &amp; forget</button>
+                  <button type="button" className="link-btn" disabled={busy} onClick={() => act('fail2ban.allow', b.ip)}>Allow</button>
+                </td>
+              </tr>
+            )) : <tr><td colSpan={7} className="muted">{d.banned.length ? 'No match.' : 'Nobody is banned right now.'}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <h2 style={{ marginTop: 18 }}>Allow-list <span className="muted h2-sub">never banned · saved in {d.jailFile}</span></h2>
+      <div className="chips">
+        {d.allowed.map((a) => (
+          <span key={a} className="chip mono">{a}
+            {!/^127\.|^::1$/.test(a) && !(d.serverIps || []).includes(a) && <button type="button" className="link-btn" disabled={busy} onClick={() => act('fail2ban.disallow', a)} aria-label={`Remove ${a}`}>×</button>}
+          </span>
+        ))}
+      </div>
+      <p className="muted note">Unban & forget also clears the address's ban history, so a new ban starts again at {Math.round(d.rules.bantimeSec / 60)} min. Bans only block SSH (port 22): websites and this dashboard stay reachable. You cannot ban this server, loopback or your own current address.</p>
+    </div>
   );
 }
 
@@ -74,8 +151,9 @@ function ActionsPanel({ password, onLock }) {
     }).catch(() => {});
   }, []);
 
-  async function run(a) {
-    const arg = a.needs === 'process' ? proc : a.needs === 'ip' ? ip.trim() : undefined;
+  async function run(a, explicitArg) {
+    if (!a) return;
+    const arg = explicitArg !== undefined ? explicitArg : a.needs === 'process' ? proc : a.needs === 'ip' ? ip.trim() : undefined;
     if (a.needs === 'ip' && !arg) { setOut({ ok: false, output: 'Enter an address first.' }); return; }
     if (a.needs === 'process' && !arg) { setOut({ ok: false, output: 'Pick an app first.' }); return; }
     const ask = CONFIRM[a.id];
@@ -92,7 +170,8 @@ function ActionsPanel({ password, onLock }) {
 
   const procActions = list.filter((a) => a.needs === 'process');
   const nginxActions = list.filter((a) => a.id.startsWith('nginx.'));
-  const f2bActions = list.filter((a) => a.id.startsWith('fail2ban.'));
+  const act = (id, arg) => run(list.find((a) => a.id === id), arg);
+  const hasF2b = list.some((a) => a.id.startsWith('fail2ban.'));
   const current = procs.find((p) => p.name === proc);
 
   return (
@@ -129,22 +208,7 @@ function ActionsPanel({ password, onLock }) {
           </div>
         </div>
 
-        {f2bActions.length > 0 && (
-          <div className="panel">
-            <h2>fail2ban <span className="muted h2-sub">SSH ban list</span></h2>
-            <div className="action-row">
-              <input type="text" className="ip-input mono" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="IP address" aria-label="IP address" />
-              <div className="action-btns">
-                {f2bActions.map((a) => (
-                  <button key={a.id} type="button" className="secondary" disabled={!!running} onClick={() => run(a)}>
-                    {running === a.id ? '…' : a.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="muted note">Pre-filled with your current address. 5 wrong SSH passwords in 10 min bans an address for 1 h (longer if it keeps happening); the web dashboard is never blocked.</p>
-          </div>
-        )}
+        {hasF2b && <BanManager act={act} running={running} runs={runs} ip={ip} setIp={setIp} />}
 
         {out && (
           <div className={`panel out ${out.ok ? '' : 'out-err'}`}>
