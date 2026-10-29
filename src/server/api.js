@@ -157,6 +157,18 @@ async function handle(req, res, pathname, ctx) {
     settings.update(body || {});
     return sendJson(res, 200, settings.publicView());
   }
+  // Change the dashboard password (also the console password). Signs out other browsers.
+  if (pathname === '/api/settings/password' && method === 'GET') {
+    return sendJson(res, 200, { changedAt: auth.passwordChangedAt });
+  }
+  if (pathname === '/api/settings/password' && method === 'POST') {
+    const body = await readJsonBody(req).catch(() => null);
+    if (!checkPw(auth, req, res, body && body.current)) return;
+    if (body.next === body.current) return sendJson(res, 400, { error: 'the new password is the same as the current one' });
+    const err = auth.setPassword(body.next);
+    if (err) return sendJson(res, 400, { error: err });
+    return sendJson(res, 200, { ok: true, changedAt: auth.passwordChangedAt }, { 'Set-Cookie': auth.cookieFor() });
+  }
   if (pathname === '/api/settings/test-email' && method === 'POST') {
     const result = await notifier.sendTest(settings.get().receivers);
     return sendJson(res, result.ok ? 200 : 400, result);

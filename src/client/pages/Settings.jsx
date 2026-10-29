@@ -9,6 +9,49 @@ const RULES = [
   ['diskPercent', 'Disk %'],
 ];
 
+// Dashboard password (also unlocks the Console). Stored as a salted hash; changing it
+// signs out every other browser, this one stays signed in.
+function PasswordCard() {
+  const [f, setF] = useState({ current: '', next: '', again: '' });
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [changedAt, setChangedAt] = useState(undefined);
+  useEffect(() => { api.passwordInfo().then((r) => setChangedAt(r.changedAt)).catch(() => {}); }, []);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  async function submit(e) {
+    e.preventDefault();
+    if (f.next.length < 12) return setMsg({ bad: true, text: 'Use at least 12 characters.' });
+    if (f.next !== f.again) return setMsg({ bad: true, text: 'The two new passwords are different.' });
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.changePassword(f.current, f.next);
+      setChangedAt(r.changedAt);
+      setF({ current: '', next: '', again: '' });
+      setMsg({ bad: false, text: 'Password changed ✓ — other browsers are signed out. Save it in your password manager.' });
+    } catch (err) {
+      setMsg({ bad: true, text: err.status === 401 ? 'Current password is wrong.' : err.message });
+    } finally { setBusy(false); }
+  }
+  return (
+    <form className="panel form-card" onSubmit={submit}>
+      <h2>Dashboard password</h2>
+      <p className="muted">Used to sign in and to unlock the Console. {changedAt ? `Last changed ${new Date(changedAt).toLocaleString()}.` : changedAt === null ? 'Still the password generated at install — change it.' : ''}</p>
+      <label className="field"><span>Current password</span>
+        <input type="password" autoComplete="current-password" value={f.current} onChange={set('current')} required /></label>
+      <div className="row">
+        <label className="field"><span>New password (12+ characters)</span>
+          <input type="password" autoComplete="new-password" value={f.next} onChange={set('next')} required /></label>
+        <label className="field"><span>New password again</span>
+          <input type="password" autoComplete="new-password" value={f.again} onChange={set('again')} required /></label>
+      </div>
+      <div className="save-row">
+        <button type="submit" disabled={busy}>{busy ? 'Changing…' : 'Change password'}</button>
+        {msg && <span className={msg.bad ? 'bad-text' : 'saved'}>{msg.text}</span>}
+      </div>
+    </form>
+  );
+}
+
 export default function Settings() {
   const [rules, setRules] = useState(null);
   const [email, setEmail] = useState(null);
@@ -91,6 +134,7 @@ export default function Settings() {
     <>
       <Header active="/settings" sub="settings" />
       <main className="wrap">
+        <PasswordCard />
         <form onSubmit={save}>
           <section className="panel form-card">
             <h2>Alert thresholds</h2>

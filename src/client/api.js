@@ -26,6 +26,8 @@ export const api = {
   getSettings: () => req('GET', '/api/settings'),
   saveSettings: (patch) => req('PUT', '/api/settings', patch),
   testEmail: () => req('POST', '/api/settings/test-email'),
+  passwordInfo: () => req('GET', '/api/settings/password'),
+  changePassword: (current, next) => req('POST', '/api/settings/password', { current, next }),
 
   alertHistory: (days, rule, q) =>
     req('GET', `/api/alerts/history?days=${days}&rule=${encodeURIComponent(rule || '')}&q=${encodeURIComponent(q || '')}`),
