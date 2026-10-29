@@ -17,7 +17,24 @@ const metrics = require('./metrics');
 const apps = require('./apps');
 const security = require('./security');
 const digest = require('./digest');
-const { sendJson, readJsonBody } = require('./http-util');
+const { sendJson, readJsonBody, clientIp, failLimiter } = require('./http-util');
+
+// One limiter for every password check (login, console unlock, console runs).
+const passwordFails = failLimiter(8, 15 * 60e3);
+function checkPw(auth, req, res, password) {
+  const ip = clientIp(req);
+  if (passwordFails.blocked(ip)) {
+    sendJson(res, 429, { error: `too many wrong passwords — try again in ${Math.ceil(passwordFails.retryAfter(ip) / 60)} min` }, { 'Retry-After': String(passwordFails.retryAfter(ip)) });
+    return false;
+  }
+  if (!auth.checkPassword(password)) {
+    passwordFails.fail(ip);
+    sendJson(res, 401, { error: 'invalid password' });
+    return false;
+  }
+  passwordFails.reset(ip);
+  return true;
+}
 
 async function handle(req, res, pathname, ctx) {
   const { auth } = ctx;
@@ -27,7 +44,7 @@ async function handle(req, res, pathname, ctx) {
   if (pathname === '/api/login' && method === 'POST') {
     const body = await readJsonBody(req).catch(() => null);
     if (!auth.hasPassword) return sendJson(res, 500, { error: 'no password configured' });
-    if (!auth.checkPassword(body && body.password)) return sendJson(res, 401, { error: 'invalid password' });
+    if (!checkPw(auth, req, res, body && body.password)) return;
     return sendJson(res, 200, { ok: true }, { 'Set-Cookie': auth.cookieFor() });
   }
   if (pathname === '/api/logout' && method === 'POST') {
@@ -161,7 +178,7 @@ async function handle(req, res, pathname, ctx) {
   // client then sends it with each run, and the server re-verifies every time.
   if (pathname === '/api/console/unlock' && method === 'POST') {
     const body = await readJsonBody(req).catch(() => null);
-    if (!auth.checkPassword(body && body.password)) return sendJson(res, 401, { error: 'invalid password' });
+    if (!checkPw(auth, req, res, body && body.password)) return;
     return sendJson(res, 200, { ok: true });
   }
   if (pathname === '/api/actions' && method === 'GET') {
@@ -169,9 +186,12 @@ async function handle(req, res, pathname, ctx) {
   }
   if (pathname === '/api/actions/run' && method === 'POST') {
     const body = await readJsonBody(req).catch(() => null);
-    if (!auth.checkPassword(body && body.password)) return sendJson(res, 401, { error: 'password required' });
-    const result = await actions.execute(body.id, body.arg);
+    if (!checkPw(auth, req, res, body && body.password)) return;
+    const result = await actions.execute(body.id, body.arg, { ip: clientIp(req) });
     return sendJson(res, result.ok ? 200 : 400, result);
+  }
+  if (pathname === '/api/actions/log' && method === 'GET') {
+    return sendJson(res, 200, { lines: actions.recent(60) });
   }
 
   return sendJson(res, 404, { error: 'not found' });

@@ -79,21 +79,35 @@ async function validProcess(name) {
   }
 }
 
-async function execute(id, arg) {
+// The monitor runs as pm2 app SELF: stopping it would take this page down, and a
+// restart would kill the request before it answers, so restart is deferred.
+const SELF = process.env.name || process.env.pm_name || 'monitoring';
+
+async function execute(id, arg, { ip = '?' } = {}) {
   const action = ACTIONS[id];
   if (!action) return { ok: false, error: 'unknown action' };
+  const who = `ip=${ip}`;
 
   if (action.needs === 'process') {
     if (!(await validProcess(arg))) {
-      audit(`DENY ${id} arg=${JSON.stringify(arg)} (invalid/unknown process)`);
+      audit(`DENY ${id} arg=${JSON.stringify(arg)} (invalid/unknown process) ${who}`);
       return { ok: false, error: 'invalid or unknown pm2 process' };
+    }
+    if (arg === SELF && id === 'pm2.stop') {
+      audit(`DENY ${id} ${arg} (would stop this dashboard) ${who}`);
+      return { ok: false, error: `"${SELF}" is this dashboard: stopping it from here would lock you out. Use SSH: pm2 stop ${SELF}` };
+    }
+    if (arg === SELF && id === 'pm2.restart') {
+      audit(`RUN  ${id} ${arg} (deferred 1 s: self) ${who}`);
+      setTimeout(() => { run('pm2', ['restart', SELF, '--update-env']); }, 1000).unref?.();
+      return { ok: true, code: 0, output: `Restarting "${SELF}" (this dashboard) in 1 s — the page reconnects by itself.` };
     }
   }
 
   const [cmd, args] = action.build(arg);
-  audit(`RUN  ${id} ${args.join(' ')}`);
+  audit(`RUN  ${id} ${args.join(' ')} ${who}`);
   const res = await run(cmd, args);
-  audit(`DONE ${id} code=${res.code}`);
+  audit(`DONE ${id} code=${res.code} ${who}`);
   return {
     ok: res.ok,
     code: res.code,
@@ -101,4 +115,18 @@ async function execute(id, arg) {
   };
 }
 
-module.exports = { list, execute };
+// Last `n` audit lines, newest first (read-only, for the console page).
+function recent(n = 60) {
+  try {
+    const st = fs.statSync(LOG);
+    const start = Math.max(0, st.size - 64 * 1024);
+    const fd = fs.openSync(LOG, 'r');
+    try {
+      const buf = Buffer.alloc(st.size - start);
+      fs.readSync(fd, buf, 0, buf.length, start);
+      return buf.toString('utf8').split('\n').filter(Boolean).slice(-n).reverse();
+    } finally { fs.closeSync(fd); }
+  } catch { return []; }
+}
+
+module.exports = { list, execute, recent };

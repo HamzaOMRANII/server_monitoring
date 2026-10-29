@@ -382,3 +382,8 @@ details.updates summary{ cursor:pointer; color:var(--ink-muted); font-size:13px;
 .test-row{ flex-wrap:wrap; }
 .row{ flex-wrap:wrap; }
 .row > .field{ flex:1 1 160px; }
+
+/* ---- console (M7) ---- */
+button.danger-outline{ border-color:color-mix(in srgb, var(--crit) 55%, transparent); color:#FCA5A5; }
+.app-title .app-console{ margin-left:auto; }
+.action-row{ flex-wrap:wrap; }

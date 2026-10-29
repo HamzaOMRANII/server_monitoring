@@ -129,9 +129,17 @@ page (no restart).
   it. `/healthz` is the only open path.
 - App binds `127.0.0.1` only — nginx terminates TLS and is the public door.
 - Before exposing publicly: TLS, and ideally an IP allowlist / VPN.
+- **Wrong-password limit:** 8 failures per 15 min per client address (Cloudflare
+  `CF-Connecting-IP`, then `X-Real-IP`) on login, console unlock and console runs.
 - **No raw terminal.** A password-gated web shell is a remote-code-execution
-  backdoor; scoped action buttons (restart a pm2 app, reload nginx) are the
-  planned path instead.
+  backdoor. Instead, **Console (`/console`)** runs a fixed list of actions
+  (`src/server/actions.js`): restart / stop / start / flush logs of an existing
+  pm2 app (name checked against `pm2 jlist`, argv never built from a shell
+  string), test nginx, reload nginx (only if the test passes). Password re-entered
+  to unlock and re-checked on every run; confirmation before stop/restart/flush/
+  reload; stopping the monitor itself is refused, restarting it is deferred 1 s;
+  every run and denial is written to `data/actions.log` with the client address
+  and shown on the page.
 
 ## Styling
 

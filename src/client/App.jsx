@@ -7,6 +7,7 @@ import Uptime from './pages/Uptime.jsx';
 import Alerts from './pages/Alerts.jsx';
 import AppDetail from './pages/AppDetail.jsx';
 import Security from './pages/Security.jsx';
+import Console from './pages/Console.jsx';
 
 // Ambient background — same petrol/blue orbs + noise as it.omranisystems.com.
 function Background() {
@@ -34,7 +35,7 @@ export default function App() {
   return (
     <>
       <Background />
-      {path === '/settings' ? <Settings /> : path === '/logs' ? <Logs /> : path === '/uptime' ? <Uptime /> : path === '/alerts' ? <Alerts /> : path === '/security' ? <Security /> : path.startsWith('/apps/') ? <AppDetail name={decodeURIComponent(path.slice(6))} /> : <Dashboard />}
+      {path === '/settings' ? <Settings /> : path === '/logs' ? <Logs /> : path === '/uptime' ? <Uptime /> : path === '/alerts' ? <Alerts /> : path === '/security' ? <Security /> : path === '/console' ? <Console /> : path.startsWith('/apps/') ? <AppDetail name={decodeURIComponent(path.slice(6))} /> : <Dashboard />}
     </>
   );
 }

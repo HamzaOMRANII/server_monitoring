@@ -53,6 +53,7 @@ export default function AppDetail({ name }) {
         <div className="app-title">
           <h1 className="mono">{a.name}</h1>
           <span className={`status ${statusCls}`}>{a.status}</span>
+          <a className="back-link app-console" href={`/console?app=${encodeURIComponent(a.name)}`} onClick={go(`/console?app=${encodeURIComponent(a.name)}`)}>Restart / stop in Console →</a>
         </div>
 
         <section className="tiles">

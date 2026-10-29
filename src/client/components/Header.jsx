@@ -9,6 +9,7 @@ const LINKS = [
   ['/alerts', 'Alerts'],
   ['/security', 'Security'],
   ['/logs', 'Logs'],
+  ['/console', 'Console'],
   ['/settings', 'Settings'],
 ];
 

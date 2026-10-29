@@ -53,4 +53,23 @@ function parseCookies(req) {
   );
 }
 
-module.exports = { sendJson, sendText, readJsonBody, parseCookies };
+// Real client address: Cloudflare's header, then nginx's X-Real-IP, then the socket.
+function clientIp(req) {
+  const h = req.headers;
+  return String(h['cf-connecting-ip'] || h['x-real-ip'] || req.socket.remoteAddress || '?').slice(0, 64);
+}
+
+// Failed-password limiter: `max` failures per `windowMs` per address, then 429
+// until the window passes. In memory (a restart forgets, which is fine).
+function failLimiter(max = 8, windowMs = 15 * 60e3) {
+  const hits = new Map(); // ip -> [timestamps]
+  const recent = (ip) => (hits.get(ip) || []).filter((t) => Date.now() - t < windowMs);
+  return {
+    blocked: (ip) => recent(ip).length >= max,
+    fail: (ip) => { const r = recent(ip); r.push(Date.now()); hits.set(ip, r); if (hits.size > 5000) hits.clear(); },
+    reset: (ip) => hits.delete(ip),
+    retryAfter: (ip) => { const r = recent(ip); return r.length ? Math.ceil((windowMs - (Date.now() - r[0])) / 1000) : 0; },
+  };
+}
+
+module.exports = { sendJson, sendText, readJsonBody, parseCookies, clientIp, failLimiter };
