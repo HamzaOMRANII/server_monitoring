@@ -266,8 +266,8 @@ async function slowChecks(force = false) {
 }
 
 // ---------------------------------------------------------------- backup status
-// Written by /projects/system_documentation/ops/omrani-backup.sh after every run.
-const BACKUP_STATUS = process.env.BACKUP_STATUS || '/root/backups/nightly/last.json';
+// Written by /projects/backup.sh after every run (see /projects/backup/OS/README-BACKUP-RESTORE.md).
+const BACKUP_STATUS = process.env.BACKUP_STATUS || '/projects/backup/OS/last.json';
 function backupStatus() {
   try {
     const j = JSON.parse(fs.readFileSync(BACKUP_STATUS, 'utf8'));
@@ -336,17 +336,17 @@ function findings(ctx) {
     add('info', `Successful SSH login(s) from new address(es): ${ssh.newLoginIps.join(', ')}`, 'Never seen before this week. If that was not you, change the root password now and check /var/log/auth.log.', []);
   }
   const bk = ctx.backup;
-  const BK_CMD = 'bash /projects/system_documentation/ops/omrani-backup.sh';
+  const BK_CMD = '/projects/backup.sh && tail -25 /projects/backup/OS/backup.log';
   if (!bk.present) {
-    add('warn', 'No server backup has run yet', 'Run the backup once, then let it run every night (see 03-backup-plan.md).', [BK_CMD]);
+    add('warn', 'No server backup has run yet', 'Run the backup once, then let it run every night (see /projects/backup/OS/README-BACKUP-RESTORE.md).', [BK_CMD]);
   } else if (!bk.ok) {
-    add('crit', 'The last server backup failed', `Failed step(s): ${bk.failed.join(', ') || 'unknown'}. Details in /root/backups/nightly/backup.log.`, [BK_CMD]);
+    add('crit', 'The last server backup failed', `Failed step(s): ${bk.failed.join(', ') || 'unknown'}. Details in /projects/backup/OS/backup.log.`, [BK_CMD]);
   } else if (bk.finishedAt && Date.now() - bk.finishedAt > 26 * HOUR) {
     add('crit', `The last server backup is ${Math.floor((Date.now() - bk.finishedAt) / HOUR)} h old`,
       'Backups should run every night at 03:00. Check that the cron line exists.',
-      ['crontab -l | grep omrani-backup', '( crontab -l; echo "0 3 * * * /projects/system_documentation/ops/omrani-backup.sh >> /root/backups/nightly/backup.log 2>&1" ) | crontab -']);
+      ['crontab -l | grep /projects/backup.sh', '( crontab -l; echo "0 3 * * * /projects/backup.sh >> /projects/backup/OS/backup.log 2>&1" ) | crontab -']);
   } else if (!bk.offsite) {
-    add('info', 'Backups stay on this server only', 'A copy outside the server (your VM with --fetch-only, or Backblaze B2) protects against losing the whole VPS.', []);
+    add('info', 'Backups stay on this server only', 'Download the newest archive from /projects/backup/OS/ to your PC every week (WinSCP); it is your only copy if the VPS is lost.', []);
   }
   if (!out.length) add('ok', 'No issues found', 'SSH, firewall, updates and open ports look fine.', []);
   const order = { crit: 0, warn: 1, info: 2, ok: 3 };
